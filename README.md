@@ -20,14 +20,16 @@ Speichere die Variablen und deploye erneut. Öffne danach die Website und trage 
 ## Features
 
 - Roblox-inspiriertes Studio-Layout mit Workspace, Live-Viewport, Explorer/Properties, Prompt-Chat, Luau-Tab und Verlauf der letzten zwölf Projekte
-- Eine direkt spielbare Starter-Arena wird bereits beim Öffnen angezeigt
+- Eine direkt spielbare Zombie-Survival-Starterarena mit Wellen, Ammo/Reload, Medkits, Credits und Bossgegnern wird bereits beim Öffnen angezeigt
+- Das geheime Spiel-Easter-Egg `6787` öffnet ein neon-cyber HACKER CONSOLE mit Heal, Overdrive, Purge, Credits, Ammo und Night Vision (nur für das eigene Spiel)
 - Groq/Gemini generieren Roblox-Server-/Client-Luau, eine spielbare HTML-Demo und eine bearbeitbare 3D-Level-Szene
 - Die HTML-Ausgabe wird geprüft; bei fehlendem Dokument wird die KI zur Reparatur aufgefordert und bei weiterem Fehler eine lokale Spiel-Demo geladen
 - Das isolierte Iframe meldet JavaScript-Laufzeitfehler zurück und versucht eine einmalige automatische Reparatur; außerdem gibt es eine manuelle Schaltfläche „Demo reparieren“
 - Isolierte Live-Vorschau und Code kopieren / Download
 - Der Generator schreibt die Level-Parts direkt in die `.rbxlx`-Place-Datei; sie sind schon im Roblox-Studio-Edit-Modus sichtbar. Server- und Client-Scripts landen getrennt in `ServerScriptService` und `StarterPlayerScripts`
 - Roblox-Live-Tab mit den offiziellen öffentlichen Experience-Daten, Spielerzahlen, Besuchen, Thumbnail und Direktlink zur echten Roblox-Experience
-- Direkte Roblox-Place-Veröffentlichung über Open Cloud nach bewusster Bestätigung
+- Optionaler Auto-Publish direkt nach erfolgreichem Build; vor dem Ersetzen der veröffentlichten Place-Version bleibt eine Bestätigung erforderlich
+- Roblox-Place-Veröffentlichung über Open Cloud; der echte Upload ist nur erfolgreich, wenn Roblox den Key und die Experience-Berechtigung akzeptiert
 
 **Architektur:** `app.py` ist der einzige Flask-Einstiegspunkt; alle Web-Routen (`/`, `/status`, `/generate`, `/starter-game`, `/roblox-preview`, `/publish-generated`, `/upload`) werden von derselben Anwendung bedient. `templates/` enthält das Dashboard und das spielbare Fallback-Game.
 
