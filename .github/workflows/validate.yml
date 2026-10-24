@@ -1,0 +1,55 @@
+name: Validate Game KI Studio
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate Python syntax
+        run: python -m py_compile app.py api/index.py
+      - name: Validate Vercel configuration and routes
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          c = json.loads(Path("vercel.json").read_text())
+          assert "rewrites" not in c, "Catch-all rewrite breaks Flask route dispatch"
+          assert "app.py" in c["functions"]
+          assert c["functions"]["app.py"]["includeFiles"] == "templates/**"
+          assert Path("templates/index.html").exists()
+          assert Path("templates/fallback-game.html").exists()
+          source = Path("app.py").read_text()
+          for route in ('@app.get("/")', '@app.get("/status")', '@app.post("/generate")',
+                        '@app.post("/publish-generated")', '@app.post("/upload")',
+                        '@app.get("/starter-game")'):
+              assert route in source, "Missing route: " + route
+          print("Vercel config and Flask routes look good")
+          PY
+      - name: Validate JavaScript syntax in HTML
+        run: |
+          node <<'NODE'
+          const fs = require("fs");
+          const vm = require("vm");
+          for (const file of ["templates/index.html", "templates/fallback-game.html"]) {
+            const html = fs.readFileSync(file, "utf8");
+            const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script\s*>/gi)];
+            if (!scripts.length) throw new Error(file + ": no inline scripts found");
+            scripts.forEach((m, i) => new vm.Script(m[1], { filename: file + "#script-" + i }));
+            console.log(file + ": " + scripts.length + " script(s) parse");
+          }
+          NODE
