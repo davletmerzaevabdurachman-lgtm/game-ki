@@ -8,19 +8,18 @@ ChatGPT-ähnliches KI-Game-Studio mit Groq/Gemini, Browser-Spielvorschau und Rob
 
 Lege in **Vercel → Project → Settings → Environment Variables** an:
 
-- `STUDIO_ACCESS_PASSWORD` — starkes Passwort für das Studio
-- `GROQ_API_KEY` — optional, falls du Groq nutzen möchtest
-- `GEMINI_API_KEY` — optional, falls du Gemini nutzen möchtest
-- `ROBLOX_API_KEY` — Open Cloud API Key mit `universe-places` Write-Recht
-- `ROBLOX_UNIVERSE_ID` — Universe ID deiner Experience
-- `ROBLOX_PLACE_ID` — Place ID, die veröffentlicht werden soll
+- `STUDIO_ACCESS_PASSWORD` — **erforderlich**, starkes Passwort für das Studio
+- `GROQ_API_KEY` — optional, wenn du Groq nutzen möchtest
+- `GEMINI_API_KEY` — optional, wenn du Gemini nutzen möchtest
 - Optional: `GROQ_MODEL`, `GEMINI_MODEL`
 
-Danach in Vercel deployen und in den Website-Einstellungen das `STUDIO_ACCESS_PASSWORD` für diese Browser-Sitzung eingeben. Provider- und Roblox-Schlüssel werden serverseitig gelesen, nicht im Browser eingegeben oder gespeichert.
+Speichere die Variablen und deploye erneut. Öffne danach die Website und trage unter **Studio-Einstellungen** das gleiche `STUDIO_ACCESS_PASSWORD` ein.
+
+**Roblox:** API-Key, Universe-ID und Place-ID kannst du im selben Einstellungsfenster eingeben. Sie bleiben nur in der aktuellen Browser-Sitzung und werden ausschließlich an den Publish-Endpunkt geschickt — nicht an Groq/Gemini und nicht in den Projektverlauf. Alternativ kannst du `ROBLOX_API_KEY`, `ROBLOX_UNIVERSE_ID` und `ROBLOX_PLACE_ID` in Vercel setzen, damit sie serverseitig bereitstehen. Der Open-Cloud-Key braucht die Berechtigung zum Veröffentlichen von Place-Versionen für die ausgewählte Experience.
 
 ## Features
 
-- Chat-ähnliche Oberfläche mit neuen Chats und lokalem Verlauf der letzten acht Projekte
+- Roblox-inspiriertes Studio-Layout mit Workspace, Live-Viewport, Explorer/Properties, Prompt-Chat, Luau-Tab und Verlauf der letzten zwölf Projekte
 - Eine direkt spielbare Starter-Arena wird bereits beim Öffnen angezeigt
 - Groq/Gemini generieren Luau und eine spielbare HTML-Demo
 - Die HTML-Ausgabe wird geprüft; bei fehlendem Dokument wird die KI zur Reparatur aufgefordert und bei weiterem Fehler eine lokale Spiel-Demo geladen
