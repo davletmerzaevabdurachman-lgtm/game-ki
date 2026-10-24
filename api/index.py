@@ -87,7 +87,7 @@ def normalize_html(source):
     if not ("<!doctype html" in lower or "<html" in lower):
         text = "<!doctype html><html lang=\"de\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Game KI Demo</title></head><body>" + text + "</body></html>"
     elif "</html>" not in lower:
-        text += "\\n</body></html>"
+        text += "\n</body></html>"
     return text
 
 def game_fallback(prompt):
@@ -108,9 +108,9 @@ def ensure_playable(prompt, provider, data):
             "Your last web_simulation was missing or invalid. Repair it into a complete standalone playable HTML game. "
             "Return the same two-field JSON schema. Keep roblox_code unchanged. The HTML must start with doctype html, "
             "contain head/body and a complete inline script, and work in a sandboxed iframe without external network, assets, "
-            "libraries, cookies or storage. Original request:\\n" + prompt[:4500] +
-            "\\nExisting Luau (preserve):\\n" + data["roblox_code"][:40000] +
-            "\\nBroken HTML to repair:\\n" + data["web_simulation"][:40000]
+            "libraries, cookies or storage. Original request:\n" + prompt[:4500] +
+            "\nExisting Luau (preserve):\n" + data["roblox_code"][:40000] +
+            "\nBroken HTML to repair:\n" + data["web_simulation"][:40000]
         )
         try:
             repaired = parse_ai(ai(repair_prompt, provider))
@@ -249,7 +249,7 @@ def generate():
             return err("Projektkontext ungültig oder zu groß.", 413)
         if code or web_demo:
             prompt = ("Erweitere das bestehende Projekt, starte nicht neu. Ursprünglicher Auftrag: " + original[:4000] +
-                      "\\nBisheriger Luau-Code:\\n" + code + "\\nBisherige HTML-Demo:\\n" + web_demo + "\\nNeue Änderung:\\n" + prompt)
+                      "\nBisheriger Luau-Code:\n" + code + "\nBisherige HTML-Demo:\n" + web_demo + "\nNeue Änderung:\n" + prompt)
     try:
         try:
             result = parse_ai(ai(prompt.strip(), provider))
