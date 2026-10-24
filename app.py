@@ -121,10 +121,11 @@ def ensure_playable(prompt, provider, data):
             data["web_simulation"] = game_fallback(prompt)
             return data
 
-def roblox_env():
+def roblox_env(config=None):
+    config = config if isinstance(config, dict) else {}
     key = os.environ.get("ROBLOX_API_KEY", "").strip()
-    universe = os.environ.get("ROBLOX_UNIVERSE_ID", "").strip()
-    place = os.environ.get("ROBLOX_PLACE_ID", "").strip()
+    universe = str(config.get("universe_id") or os.environ.get("ROBLOX_UNIVERSE_ID", "")).strip()
+    place = str(config.get("place_id") or os.environ.get("ROBLOX_PLACE_ID", "")).strip()
     if not all((key, universe, place)):
         raise RuntimeError("ROBLOX_API_KEY, ROBLOX_UNIVERSE_ID und ROBLOX_PLACE_ID müssen in Vercel gesetzt sein.")
     if not (universe.isdigit() and 1 <= len(universe) <= 24) or not (place.isdigit() and 1 <= len(place) <= 24):
@@ -179,8 +180,8 @@ def place_xml(source, title):
         raise ValueError("Place-XML konnte nicht erstellt werden.")
     return output
 
-def publish_bytes(payload, content_type="application/xml"):
-    key, universe, place = roblox_env()
+def publish_bytes(payload, content_type="application/xml", config=None):
+    key, universe, place = roblox_env(config)
     try:
         response = requests.post(
             "https://apis.roblox.com/universes/v1/" + universe + "/places/" + place + "/versions",
