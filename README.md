@@ -4,6 +4,8 @@ ChatGPT-ähnliches KI-Game-Studio mit Groq/Gemini, Browser-Spielvorschau und Rob
 
 ## Vercel Setup
 
+**Wichtig für das Routing:** Vercel erkennt die Flask-Anwendung automatisch anhand von `app.py`. Lass die Catch-all-`rewrites` weg; sie können dazu führen, dass Flask nur `/api/index.py` sieht und deshalb „Route nicht gefunden“ meldet. `vercel.json` bündelt die Templates mit der Funktion.
+
 Lege in **Vercel → Project → Settings → Environment Variables** an:
 
 - `STUDIO_ACCESS_PASSWORD` — starkes Passwort für das Studio
@@ -26,5 +28,7 @@ Danach in Vercel deployen und in den Website-Einstellungen das `STUDIO_ACCESS_PA
 - Isolierte Live-Vorschau und Code kopieren / Download
 - Roblox-Code kann Server- und Client-Script-Marker enthalten; beim Open-Cloud-Publishing werden die Skripte auf `ServerScriptService` und `StarterPlayerScripts` getrennt
 - Direkte Roblox Place-Veröffentlichung über Roblox Open Cloud nach bewusster Bestätigung
+
+**Architektur:** `app.py` ist der einzige Flask-Einstiegspunkt; alle Web-Routen (`/`, `/status`, `/generate`, `/starter-game`, `/publish-generated`, `/upload`) werden von derselben Anwendung bedient. `templates/` enthält das Dashboard und das spielbare Fallback-Game.
 
 **Wichtig:** Das direkte Publishing erstellt eine kompakte XML-Place-Datei mit einem ServerScriptService-Script. Es ersetzt die veröffentlichte Version des konfigurierten Places. Teste und prüfe KI-generierten Code vor dem Veröffentlichen; bei einer von Roblox abgelehnten Datei muss sie in Roblox Studio geöffnet und veröffentlicht werden.
