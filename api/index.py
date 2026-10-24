@@ -28,7 +28,7 @@ def ai(prompt,provider):
  return genai.Client(api_key=key).models.generate_content(model=os.environ.get("GEMINI_MODEL","gemini-3.8-flash"),contents=prompt,config=types.GenerateContentConfig(system_instruction=SYSTEM,response_mime_type="application/json",temperature=.2,max_output_tokens=16000)).text
 def parse_ai(raw):
  text=(raw or "").strip()
- if text.startswith(chr(96)*3): text=re.sub("^"+chr(96)*3+"(?:json)?\\s*","",text,count=1,flags=re.I);text=re.sub("\\s*"+chr(96)*3+"$","",text,count=1)
+ if text.startswith(chr(96)*3): text=re.sub("^"+chr(96)*3+"(?:json)?\s*","",text,count=1,flags=re.I);text=re.sub("\s*"+chr(96)*3+"$","",text,count=1)
  try: data=json.loads(text)
  except ValueError:
   a,b=text.find("{"),text.rfind("}")
@@ -40,7 +40,7 @@ def parse_ai(raw):
 def roblox_env():
  key=os.environ.get("ROBLOX_API_KEY","").strip();universe=os.environ.get("ROBLOX_UNIVERSE_ID","").strip();place=os.environ.get("ROBLOX_PLACE_ID","").strip()
  if not all((key,universe,place)): raise RuntimeError("ROBLOX_API_KEY, ROBLOX_UNIVERSE_ID und ROBLOX_PLACE_ID müssen in Vercel gesetzt sein.")
- if not re.fullmatch(r"\\d{1,24}",universe) or not re.fullmatch(r"\\d{1,24}",place): raise ValueError("Roblox-IDs müssen numerisch sein.")
+ if not re.fullmatch(r"\d{1,24}",universe) or not re.fullmatch(r"\d{1,24}",place): raise ValueError("Roblox-IDs müssen numerisch sein.")
  return key,universe,place
 def place_xml(source,title):
  root=ET.Element("roblox",{"version":"4"})
@@ -79,7 +79,7 @@ def generate():
   if not isinstance(previous,dict): return err("Projektkontext ungültig.",400)
   code,html,original=previous.get("roblox_code",""),previous.get("web_simulation",""),previous.get("original_prompt","")
   if not all(isinstance(x,str) for x in (code,html,original)) or len(code)>100000 or len(html)>100000: return err("Projektkontext ungültig oder zu groß.",413)
-  if code or html: prompt="Erweitere das bestehende Projekt, starte nicht neu. Ursprünglicher Auftrag: "+original[:4000]+"\\nBisher Luau:\\n"+code+"\\nBisher HTML:\\n"+html+"\\nNeue Änderung:\\n"+prompt
+  if code or html: prompt="Erweitere das bestehende Projekt, starte nicht neu. Ursprünglicher Auftrag: "+original[:4000]+"\nBisher Luau:\n"+code+"\nBisher HTML:\n"+html+"\nNeue Änderung:\n"+prompt
  try:
   raw=ai(prompt.strip(),provider)
   if not raw: return err("Die KI hat keine Antwort geliefert.",502)
