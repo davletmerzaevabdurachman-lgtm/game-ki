@@ -581,14 +581,51 @@ def publish_bytes(payload, content_type="application/xml", config=None):
             detail=response.text[:400]
         app.logger.warning("Roblox publish rejected HTTP %s",response.status_code)
         if response.status_code in (401,403):
-            message=("Roblox lehnt den Schlüssel für die angeforderte Experience ab. "
-                     "Die API-Berechtigung universe-places mit Write muss genau für die Experience freigegeben sein, "
-                     "zu der die gesendete Universe ID gehört. Prüfe außerdem, ob die Place ID zu dieser Universe ID gehört "
-                     "und ob Game KI den aktuellen Schlüssel verwendet.")
+            # Some Roblox accounts report Published authorization failures on the standard API
+            # despite the configured scope. Try Saved once as a clearly marked non-live fallback.
+            # This does NOT publish the experience; the caller must be told explicitly.
+            try:
+                saved_response = requests.post(
+                    "https://apis.roblox.com/universes/v1/" + universe + "/places/" + place + "/versions",
+                    params={"versionType": "Saved"},
+                    headers={"x-api-key": key, "Content-Type": content_type},
+                    data=payload, timeout=(10, 120))
+            except requests.Timeout:
+                saved_response = None
+            except requests.RequestException:
+                saved_response = None
+            if saved_response is not None and saved_response.ok:
+                try:
+                    saved_result = saved_response.json()
+                except ValueError:
+                    saved_result = {}
+                app.logger.warning(
+                    "Roblox refused Published but accepted Saved for universe=%s place=%s",
+                    universe, place
+                )
+                return jsonify({
+                    "ok": True,
+                    "savedOnly": True,
+                    "message": "Roblox hat die Place-Datei nur als Saved-Version angenommen. Das Live-Spiel wurde NICHT aktualisiert. Öffne Roblox Studio/Creator Dashboard und veröffentliche die gespeicherte Version manuell.",
+                    "versionNumber": saved_result.get("versionNumber"),
+                    "universeId": universe,
+                    "placeId": place
+                })
+            if saved_response is not None:
+                try:
+                    saved_detail = saved_response.json()
+                except ValueError:
+                    saved_detail = saved_response.text[:300]
+            else:
+                saved_detail = "Saved-Fallback konnte wegen einer Netzwerk-/Zeitüberschreitung nicht geprüft werden."
+            message=("Roblox verweigert Published weiterhin. Auch der automatische Saved-Fallback hat nicht funktioniert. "
+                     "Das weist auf Berechtigungen des API-Key-Eigentümers oder Roblox-Zugriff auf diese Experience hin; "
+                     "die IDs werden bereits anhand der Place ID abgeglichen.")
             # Echo only non-secret identifiers so a scope failure can be diagnosed without exposing credentials.
             return jsonify({
                 "error":message,
-                "details":str(detail)[:600],
+                "details":str(detail)[:500],
+                "savedAttempt":str(saved_detail)[:300],
                 "universeId":universe,
                 "placeId":place
             }),response.status_code
