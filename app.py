@@ -64,8 +64,8 @@ def parse_ai(raw):
     text = (raw or "").strip()
     ticks = chr(96) * 3
     if text.startswith(ticks):
-        text = re.sub("^" + ticks + "(?:json)?\s*", "", text, count=1, flags=re.I)
-        text = re.sub("\s*" + ticks + "$", "", text, count=1)
+        text = re.sub("^" + ticks + "(?:json)?\\s*", "", text, count=1, flags=re.I)
+        text = re.sub("\\s*" + ticks + "$", "", text, count=1)
     try:
         data = json.loads(text)
     except ValueError:
@@ -215,7 +215,7 @@ def normalize_scene(raw_scene, prompt):
         name=re.sub(r"[\x00-\x1f]","",str(raw.get("name","LevelPart")))[:80].strip() or "LevelPart"
         parts.append({"name":name,"size":size,"position":pos,"color":color,"material":material,
                       "anchored":True,"can_collide":bool(raw.get("can_collide",True)),
-                      "transparency":max(0,min(1,transparency)),"yaw":max(-180,min(180,yaw)})
+                      "transparency":max(0,min(1,transparency)),"yaw":max(-180,min(180,yaw))})
     if len(parts)<8: return default_scene(prompt)
     if not any(("ground" in p["name"].lower() or "floor" in p["name"].lower() or "terrain" in p["name"].lower()) and p["size"][0]>=60 and p["size"][2]>=60 for p in parts):
         parts.insert(0,_scene_part("GameKI_Ground",[180,4,180],[0,-3,0],[.22,.24,.27],"Concrete"))
