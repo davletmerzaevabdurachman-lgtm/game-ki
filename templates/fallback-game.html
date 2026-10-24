@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Game KI · Sofort spielbare Arena</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#070c14;color:#eaf4ff;font:14px system-ui;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:12px}.wrap{width:min(920px,100%)}header{display:flex;justify-content:space-between;gap:12px;align-items:center;margin:0 0 10px;flex-wrap:wrap}h1{font-size:clamp(16px,3vw,24px);margin:0}.help{color:#9cb3cc;font-size:12px;line-height:1.55;margin:7px 0 12px}.tag{color:#81f2be;border:1px solid #276448;background:#102b20;border-radius:20px;padding:6px 10px;font-size:11px}canvas{display:block;width:100%;aspect-ratio:16/9;max-height:66vh;background:#0a1421;border:1px solid #31445b;border-radius:12px;touch-action:none}button{background:#81efba;color:#071910;font-weight:800;border:0;border-radius:9px;padding:9px 13px;cursor:pointer}.controls{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}.stat{display:flex;gap:12px;flex-wrap:wrap;color:#c3d9ee;font-size:12px}.fallback{font-size:10px;color:#71869c;margin-top:8px}</style>
+</head>
+<body><main class="wrap">
+<header><h1>⚡ <span id="title">Game KI · Survival Arena</span></h1><span class="tag">SOFORT SPIELBAR</span></header>
+<p class="help">Überlebe die Arena: Bewege dich mit WASD/Pfeilen, klicke oder tippe zum Schießen, sammle grüne Energie-Orbs. Auf Touchscreens kannst du auf die Arena tippen und halten. Erreiche 15 Punkte, bevor deine Energie auf null sinkt.</p>
+<canvas id="game" width="900" height="506" aria-label="Spielarena"></canvas>
+<div class="controls"><div class="stat"><span>Score: <b id="score">0</b>/15</span><span>Energie: <b id="hp">100</b>%</span><span id="state">Ziel: Überleben</span></div><button id="restart">↻ Neu starten</button></div>
+<p class="fallback">Automatisch spielbare Sicherheits-Demo: Die KI-Antwort enthielt kein verwendbares HTML-Spiel. Du kannst bereits spielen; sende im Chat einen konkreteren Änderungswunsch für die maßgeschneiderte Version.</p>
+</main>
+<script>
+(function(){
+"use strict";
+const c=document.getElementById("game"),ctx=c.getContext("2d"),scoreEl=document.getElementById("score"),hpEl=document.getElementById("hp"),stateEl=document.getElementById("state");
+let keys={},player,enemies,orbs,shots,score,hp,over,won,frame,mouse;
+function reset(){player={x:450,y:253,r:13,speed:3.7,hit:0};enemies=[];orbs=[];shots=[];score=0;hp=100;over=false;won=false;frame=0;mouse=null;keys={};for(let i=0;i<4;i++)spawnEnemy();for(let i=0;i<5;i++)spawnOrb();paintUI()}
+function spawnEnemy(){let edge=Math.floor(Math.random()*4),x=edge===0?15:edge===1?885:Math.random()*900,y=edge===2?15:edge===3?491:Math.random()*506;enemies.push({x,y,r:10+Math.random()*5,speed:.65+Math.random()*.4})}
+function spawnOrb(){orbs.push({x:30+Math.random()*840,y:30+Math.random()*446,r:7})}
+function paintUI(){scoreEl.textContent=score;hpEl.textContent=hp;stateEl.textContent=won?"GEWONNEN!":over?"GAME OVER":"Ziel: 15 Punkte"}
+function pos(e){let r=c.getBoundingClientRect();return{x:(e.clientX-r.left)*c.width/r.width,y:(e.clientY-r.top)*c.height/r.height}}
+c.addEventListener("pointerdown",e=>{c.setPointerCapture&&c.setPointerCapture(e.pointerId);mouse=pos(e);shoot(mouse)});
+c.addEventListener("pointermove",e=>{if(e.buttons)mouse=pos(e)});
+c.addEventListener("pointerup",()=>mouse=null);
+function shoot(t){if(over||won)return;let a=Math.atan2(t.y-player.y,t.x-player.x);shots.push({x:player.x,y:player.y,vx:Math.cos(a)*7,vy:Math.sin(a)*7,r:4,life:55})}
+window.addEventListener("keydown",e=>{let k=e.key.toLowerCase();keys[k]=true;if([" ","arrowup","arrowdown","arrowleft","arrowright"].includes(k))e.preventDefault();if(k===" "&&mouse)shoot(mouse)});
+window.addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
+document.getElementById("restart").onclick=reset;
+function circle(x,y,r,color){ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fillStyle=color;ctx.fill()}
+function draw(){
+ctx.clearRect(0,0,c.width,c.height);ctx.fillStyle="#0c1927";ctx.fillRect(0,0,c.width,c.height);ctx.strokeStyle="#16283a";ctx.lineWidth=1;
+for(let x=0;x<c.width;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,c.height);ctx.stroke()}
+for(let y=0;y<c.height;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(c.width,y);ctx.stroke()}
+if(!over&&!won){
+frame++;let dx=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0),dy=(keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0),len=Math.hypot(dx,dy)||1;
+player.x=Math.max(15,Math.min(885,player.x+dx/len*player.speed));player.y=Math.max(15,Math.min(491,player.y+dy/len*player.speed));
+if(frame%95===0&&enemies.length<14)spawnEnemy();if(frame%115===0&&orbs.length<8)spawnOrb();
+for(let en of enemies){let a=Math.atan2(player.y-en.y,player.x-en.x);en.x+=Math.cos(a)*en.speed;en.y+=Math.sin(a)*en.speed;if(Math.hypot(player.x-en.x,player.y-en.y)<player.r+en.r&&player.hit===0){hp=Math.max(0,hp-12);player.hit=32}}
+if(player.hit>0)player.hit--;
+for(let s of shots){s.x+=s.vx;s.y+=s.vy;s.life--;for(let i=enemies.length-1;i>=0;i--){let en=enemies[i];if(Math.hypot(s.x-en.x,s.y-en.y)<s.r+en.r){enemies.splice(i,1);s.life=0;score++;break}}}
+shots=shots.filter(s=>s.life>0&&s.x>-10&&s.x<910&&s.y>-10&&s.y<516);
+for(let i=orbs.length-1;i>=0;i--){if(Math.hypot(player.x-orbs[i].x,player.y-orbs[i].y)<player.r+orbs[i].r){orbs.splice(i,1);hp=Math.min(100,hp+16);score++}}
+if(hp<=0)over=true;if(score>=15)won=true;paintUI()
+}
+for(let o of orbs)circle(o.x,o.y,o.r,"#70f2b0");
+for(let en of enemies){circle(en.x,en.y,en.r,"#ff5875");circle(en.x-3,en.y-2,2,"#fff")}
+for(let s of shots)circle(s.x,s.y,s.r,"#9bd5ff");
+circle(player.x,player.y,player.r,player.hit&&Math.floor(player.hit/4)%2?"#fff":"#66b8ff");ctx.beginPath();ctx.arc(player.x,player.y,player.r+6,0,Math.PI*2);ctx.strokeStyle="#66b8ff66";ctx.stroke();
+if(over||won){ctx.fillStyle="#07101ddc";ctx.fillRect(0,0,c.width,c.height);ctx.fillStyle=won?"#82f4bd":"#ff8096";ctx.textAlign="center";ctx.font="bold 42px system-ui";ctx.fillText(won?"LEVEL GESCHAFFT!":"GAME OVER",450,238);ctx.fillStyle="#e6f0ff";ctx.font="18px system-ui";ctx.fillText("Score: "+score+" · Drücke Neu starten",450,276)}
+requestAnimationFrame(draw)
+}
+reset();draw()
+})();
+</script></body></html>
