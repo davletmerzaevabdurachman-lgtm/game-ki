@@ -21,13 +21,14 @@ Speichere die Variablen und deploye erneut. Öffne danach die Website und trage 
 
 - Roblox-inspiriertes Studio-Layout mit Workspace, Live-Viewport, Explorer/Properties, Prompt-Chat, Luau-Tab und Verlauf der letzten zwölf Projekte
 - Eine direkt spielbare Starter-Arena wird bereits beim Öffnen angezeigt
-- Groq/Gemini generieren Luau und eine spielbare HTML-Demo
+- Groq/Gemini generieren Roblox-Server-/Client-Luau, eine spielbare HTML-Demo und eine bearbeitbare 3D-Level-Szene
 - Die HTML-Ausgabe wird geprüft; bei fehlendem Dokument wird die KI zur Reparatur aufgefordert und bei weiterem Fehler eine lokale Spiel-Demo geladen
 - Das isolierte Iframe meldet JavaScript-Laufzeitfehler zurück und versucht eine einmalige automatische Reparatur; außerdem gibt es eine manuelle Schaltfläche „Demo reparieren“
 - Isolierte Live-Vorschau und Code kopieren / Download
-- Roblox-Code kann Server- und Client-Script-Marker enthalten; beim Open-Cloud-Publishing werden die Skripte auf `ServerScriptService` und `StarterPlayerScripts` getrennt
-- Direkte Roblox Place-Veröffentlichung über Roblox Open Cloud nach bewusster Bestätigung
+- Der Generator schreibt die Level-Parts direkt in die `.rbxlx`-Place-Datei; sie sind schon im Roblox-Studio-Edit-Modus sichtbar. Server- und Client-Scripts landen getrennt in `ServerScriptService` und `StarterPlayerScripts`
+- Roblox-Live-Tab mit den offiziellen öffentlichen Experience-Daten, Spielerzahlen, Besuchen, Thumbnail und Direktlink zur echten Roblox-Experience
+- Direkte Roblox-Place-Veröffentlichung über Open Cloud nach bewusster Bestätigung
 
-**Architektur:** `app.py` ist der einzige Flask-Einstiegspunkt; alle Web-Routen (`/`, `/status`, `/generate`, `/starter-game`, `/publish-generated`, `/upload`) werden von derselben Anwendung bedient. `templates/` enthält das Dashboard und das spielbare Fallback-Game.
+**Architektur:** `app.py` ist der einzige Flask-Einstiegspunkt; alle Web-Routen (`/`, `/status`, `/generate`, `/starter-game`, `/roblox-preview`, `/publish-generated`, `/upload`) werden von derselben Anwendung bedient. `templates/` enthält das Dashboard und das spielbare Fallback-Game.
 
-**Wichtig:** Das direkte Publishing erstellt eine kompakte XML-Place-Datei mit einem ServerScriptService-Script. Es ersetzt die veröffentlichte Version des konfigurierten Places. Teste und prüfe KI-generierten Code vor dem Veröffentlichen; bei einer von Roblox abgelehnten Datei muss sie in Roblox Studio geöffnet und veröffentlicht werden.
+**Wichtig:** Open Cloud veröffentlicht eine komplette XML-Place-Datei mit einer bearbeitbaren Blockout-Level-Geometrie plus Server- und Client-Scripts. Das ersetzt den Inhalt der ausgewählten Place-Version; deshalb erst in einem Test-Place prüfen. Die Browseransicht kann den nativen Roblox-3D-Player nicht in ein fremdes Website-iframe einbetten. Der Roblox-Live-Tab zeigt die offizielle Experience-Vorschau und öffnet bei Bedarf den echten Roblox-Player. KI-generierte Scripts immer testen, denn automatisches Hochladen allein garantiert keine fehlerfreie Spielmechanik.
