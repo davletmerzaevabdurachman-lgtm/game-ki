@@ -254,7 +254,7 @@ def generate():
         try:
             result = parse_ai(ai(prompt.strip(), provider))
         except ValueError:
-            result = parse_ai(ai("Return a valid JSON object with roblox_code and web_simulation for this request, with complete runnable HTML. No Markdown. Request:\\n" + prompt[:10000], provider))
+            result = parse_ai(ai("Return a valid JSON object with roblox_code and web_simulation for this request, with complete runnable HTML. No Markdown. Request:\n" + prompt[:10000], provider))
         result = ensure_playable(prompt.strip(), provider, result)
         return jsonify({"roblox_code": result["roblox_code"], "web_simulation": result["web_simulation"]})
     except RuntimeError as exc:
