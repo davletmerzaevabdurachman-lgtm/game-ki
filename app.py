@@ -26,6 +26,48 @@ ZOMBIE SURVIVAL QUALITY: When the prompt is zombie/survival/horror themed, creat
 WEB OUTPUT: web_simulation is a complete standalone HTML5 document beginning with <!doctype html>, containing html/head/body and inline JavaScript. It must be genuinely playable immediately in the sandbox: implement the same core loop and game theme, movement, aim/attack, collisions/obstacles, enemy/objective behavior, health/ammo/progress feedback, win/lose or round progression, restart, and the working 6787 menu. Keyboard and pointer/touch input plus responsive on-screen controls. Inline CSS/JS only; no external assets/libraries/network/fetch/WebSocket/cookies/localStorage/dynamic imports/external fonts. Do not return a decorative mockup in place of gameplay.
 For edits preserve and extend existing scripts, HTML and scene context. Before output, check that both Luau scripts are complete and HTML logic is real and complete. Return only valid JSON."""
 
+# Strict Structured Outputs schema supported by Groq's GPT-OSS models.
+# This prevents invalid JSON when Luau/HTML contains quotes, backslashes and newlines.
+GAME_JSON_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "roblox_code": {"type": "string"},
+        "web_simulation": {"type": "string"},
+        "roblox_scene": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "theme": {"type": "string"},
+                "spawn": {"type": "array", "items": {"type": "number"}},
+                "parts": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string"},
+                            "size": {"type": "array", "items": {"type": "number"}},
+                            "position": {"type": "array", "items": {"type": "number"}},
+                            "color": {"type": "array", "items": {"type": "number"}},
+                            "material": {"type": "string"},
+                            "can_collide": {"type": "boolean"},
+                            "transparency": {"type": "number"},
+                            "yaw": {"type": "number"}
+                        },
+                        "required": ["name", "size", "position", "color", "material",
+                                     "can_collide", "transparency", "yaw"],
+                        "additionalProperties": False
+                    }
+                }
+            },
+            "required": ["name", "theme", "spawn", "parts"],
+            "additionalProperties": False
+        }
+    },
+    "required": ["roblox_code", "web_simulation", "roblox_scene"],
+    "additionalProperties": False
+}
+
+
 def err(message, status):
     return jsonify({"error": message}), status
 
@@ -47,8 +89,10 @@ def ai(prompt, provider):
         response = Groq(api_key=key, timeout=160, max_retries=1).chat.completions.create(
             model=os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b"),
             messages=[{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}],
-            temperature=0.2, max_completion_tokens=24000,
-            response_format={"type": "json_object"})
+            temperature=0.2, max_completion_tokens=48000,
+            response_format={"type": "json_schema", "json_schema": {
+                "name": "game_build", "strict": True, "schema": GAME_JSON_SCHEMA
+            }})
         return response.choices[0].message.content
     from google import genai
     from google.genai import types
@@ -59,7 +103,7 @@ def ai(prompt, provider):
         model=os.environ.get("GEMINI_MODEL", "gemini-3.8-flash"),
         contents=prompt,
         config=types.GenerateContentConfig(system_instruction=SYSTEM, response_mime_type="application/json",
-                                           temperature=0.2, max_output_tokens=24000))
+                                           temperature=0.2, max_output_tokens=48000))
     return response.text
 
 def parse_ai(raw):
