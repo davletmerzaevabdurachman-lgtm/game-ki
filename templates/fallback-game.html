@@ -3,57 +3,150 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Game KI · Sofort spielbare Arena</title>
+<meta name="theme-color" content="#091018">
+<title>Game KI · Zombie Protocol</title>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#070c14;color:#eaf4ff;font:14px system-ui;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:12px}.wrap{width:min(920px,100%)}header{display:flex;justify-content:space-between;gap:12px;align-items:center;margin:0 0 10px;flex-wrap:wrap}h1{font-size:clamp(16px,3vw,24px);margin:0}.help{color:#9cb3cc;font-size:12px;line-height:1.55;margin:7px 0 12px}.tag{color:#81f2be;border:1px solid #276448;background:#102b20;border-radius:20px;padding:6px 10px;font-size:11px}canvas{display:block;width:100%;aspect-ratio:16/9;max-height:66vh;background:#0a1421;border:1px solid #31445b;border-radius:12px;touch-action:none}button{background:#81efba;color:#071910;font-weight:800;border:0;border-radius:9px;padding:9px 13px;cursor:pointer}.controls{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}.stat{display:flex;gap:12px;flex-wrap:wrap;color:#c3d9ee;font-size:12px}.fallback{font-size:10px;color:#71869c;margin-top:8px}</style>
+:root{color-scheme:dark;--bg:#080d13;--panel:#101923;--line:#293743;--muted:#8b9ba8;--text:#f1f6fa;--mint:#8af0b5;--cyan:#66e9e4;--red:#ff687e;--amber:#ffca79}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% -10%,#1c3640 0,transparent 45%),#080d13;color:var(--text);font:13px/1.45 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;padding:13px;display:grid;place-items:center}.shell{width:min(1120px,100%);display:grid;gap:10px}.top{display:flex;align-items:center;justify-content:space-between;gap:14px;border:1px solid #2e414b;background:linear-gradient(105deg,#16222b,#101720);border-radius:14px;padding:12px 14px}.brand{display:flex;align-items:center;gap:10px;min-width:0}.mark{width:35px;height:35px;border-radius:10px;border:1px solid #42645e;display:grid;place-items:center;color:var(--mint);background:linear-gradient(140deg,#1d5546,#142e30);box-shadow:0 0 23px #55eeb120;font-size:17px}.name{font-size:12px;font-weight:900;letter-spacing:.09em}.subtitle{margin-top:2px;font-size:9px;letter-spacing:.15em;color:#8194a1}.state{display:flex;align-items:center;gap:7px;border:1px solid #325344;background:#142a22;color:#a6f3c9;padding:6px 9px;border-radius:100px;font-size:8px;font-weight:900;letter-spacing:.12em;white-space:nowrap}.dot{width:6px;height:6px;border-radius:50%;background:#8af0b5;box-shadow:0 0 9px #8af0b5}.top-actions{display:flex;align-items:center;gap:7px}.btn{border:1px solid #3b4c57;background:#18232c;color:#d5e2e9;border-radius:8px;padding:8px 10px;cursor:pointer;font-size:9px;font-weight:850}.btn:hover{filter:brightness(1.18)}.btn-green{border-color:#74cda4;background:#87e8b4;color:#08170f}.btn-cyber{border-color:#286e78;background:#102d35;color:#8cf7ee}.panel{border:1px solid #293944;background:#101923;border-radius:14px;overflow:hidden;box-shadow:0 20px 70px #0003}.gamehead{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;border-bottom:1px solid #293944}.game-title{font-size:11px;font-weight:900;letter-spacing:.03em}.game-sub{font-size:9px;color:#7f909f;margin-top:2px}.metrics{display:flex;gap:6px;flex-wrap:wrap}.metric{border:1px solid #293a46;background:#0c141c;border-radius:7px;padding:6px 9px;min-width:63px}.metric span{font-size:7px;color:#8194a2;letter-spacing:.12em;display:block}.metric b{font-size:12px;display:block;margin-top:2px}.metric.hp b{color:#9af0bd}.metric.ammo b{color:#8fe7ff}.metric.wave b{color:#ffd28c}.arena{position:relative;background:#09121a;overflow:hidden}.arena canvas{display:block;width:100%;aspect-ratio:16/9;max-height:64vh;min-height:250px;object-fit:contain;touch-action:none;cursor:crosshair}.hudnote{display:flex;justify-content:space-between;gap:9px;align-items:center;flex-wrap:wrap;padding:9px 12px;background:#0d151e;border-top:1px solid #263541;color:#8a9ba8;font-size:9px}.key{color:#d9e6ec;border:1px solid #40505c;background:#1a2530;border-radius:5px;padding:2px 5px;font-size:8px;font-weight:800}.message{color:#a5b5c1}.message strong{color:#8df3b7}.controls{display:flex;align-items:center;gap:7px}.reload{color:#ffd28c}.touchpad{display:none;position:absolute;left:10px;bottom:12px;gap:4px;grid-template-columns:repeat(3,32px);grid-template-rows:repeat(2,30px);z-index:3;opacity:.84}.touchpad button,.touchfire{border:1px solid #7692a4;background:#132a37d9;color:white;border-radius:7px;font-weight:900}.touchpad button{width:32px;height:30px;padding:0}.touchpad .blank{visibility:hidden}.touchfire{display:none;position:absolute;right:12px;bottom:12px;width:62px;height:62px;z-index:3;border-radius:50%;background:#6f2638d9;border-color:#ff758a;color:#ffe2e7;font-size:10px}.overlay[hidden]{display:none!important}.overlay{position:absolute;inset:0;display:grid;place-items:center;padding:12px;background:#050a10d9;backdrop-filter:blur(5px);z-index:8}.dialog{width:min(420px,100%);border:1px solid #425461;border-radius:13px;background:linear-gradient(145deg,#131f29,#0a1118);box-shadow:0 22px 75px #000a;padding:19px}.eyebrow{font-size:8px;letter-spacing:.18em;color:#79e8d8;font-weight:900}.dialog h2{font-size:19px;letter-spacing:-.5px;margin:7px 0 5px}.dialog p{color:#94a5b2;font-size:10px;line-height:1.7;margin:0 0 13px}.field{display:flex;gap:7px}.field input{min-width:0;flex:1;background:#070d13;border:1px solid #384c59;color:white;border-radius:8px;padding:10px 11px;letter-spacing:.16em;outline:0}.field input:focus{border-color:#67e9d9;box-shadow:0 0 0 3px #67e9d91a}.err{min-height:16px;color:#ff8597;font-size:9px;margin-top:7px}.cyberdialog{border-color:#25726d;background:radial-gradient(ellipse at 0 0,#123c3a,#0d161d 60%)}.cyberdialog .eyebrow{color:#83fae7}.hackerstatus{display:flex;align-items:center;justify-content:space-between;gap:9px;padding:7px 9px;border:1px solid #254942;background:#0c211f;border-radius:8px;font-size:8px;color:#8aeed2;letter-spacing:.1em;margin:12px 0}.actions{display:grid;grid-template-columns:1fr 1fr;gap:7px}.action{padding:10px;border:1px solid #285b58;background:#0e2828;color:#b4fff0;text-align:left;border-radius:8px;cursor:pointer}.action:hover{background:#143b38;border-color:#49b9a9}.action b{display:block;font-size:9px;letter-spacing:.06em}.action span{display:block;margin-top:4px;color:#7faaa6;font-size:8px;line-height:1.45}.close-row{display:flex;justify-content:space-between;gap:8px;margin-top:12px;align-items:center;font-size:8px;color:#64817d}.screenmsg{font-size:9px;color:#9df6df;min-height:14px;margin-top:7px}.footer{font-size:8px;color:#566b79;text-align:center;line-height:1.6;padding:2px 8px}
+@media(max-width:640px){body{padding:7px}.top{padding:9px}.subtitle{display:none}.state{font-size:7px;padding:5px 7px}.btn{padding:7px}.metrics{gap:4px}.metric{padding:5px 7px;min-width:57px}.arena canvas{min-height:240px;max-height:57vh}.touchpad,.touchfire{display:grid}.touchfire{display:block}.hudnote{padding:8px}.message{max-width:100%}.actions{grid-template-columns:1fr 1fr}}
+</style>
 </head>
-<body><main class="wrap">
-<header><h1>⚡ <span id="title">Game KI · Survival Arena</span></h1><span class="tag">SOFORT SPIELBAR</span></header>
-<p class="help">Überlebe die Arena: Bewege dich mit WASD/Pfeilen, klicke oder tippe zum Schießen, sammle grüne Energie-Orbs. Auf Touchscreens kannst du auf die Arena tippen und halten. Erreiche 15 Punkte, bevor deine Energie auf null sinkt.</p>
-<canvas id="game" width="900" height="506" aria-label="Spielarena"></canvas>
-<div class="controls"><div class="stat"><span>Score: <b id="score">0</b>/15</span><span>Energie: <b id="hp">100</b>%</span><span id="state">Ziel: Überleben</span></div><button id="restart">↻ Neu starten</button></div>
-<p class="fallback">Automatisch spielbare Sicherheits-Demo: Die KI-Antwort enthielt kein verwendbares HTML-Spiel. Du kannst bereits spielen; sende im Chat einen konkreteren Änderungswunsch für die maßgeschneiderte Version.</p>
+<body>
+<main class="shell">
+<header class="top">
+  <div class="brand"><div class="mark">☣</div><div><div class="name">NIGHTFALL // OUTBREAK</div><div class="subtitle">ZOMBIE SURVIVAL PROTOCOL</div></div></div>
+  <div class="top-actions"><span class="state"><i class="dot"></i> LIVE BUILD</span><button class="btn btn-cyber" id="secretBtn">⌘ SECRET CONSOLE</button><button class="btn" id="restartTop">↻ Reset</button></div>
+</header>
+<section class="panel">
+  <div class="gamehead"><div><div class="game-title" id="title">Game KI · Zombie Protocol</div><div class="game-sub">SECTOR 07 · QUARANTINE BREACH · SURVIVE THE WAVES</div></div><div class="metrics"><div class="metric wave"><span>WAVE</span><b id="wave">01</b></div><div class="metric"><span>ELIMINATIONS</span><b id="kills">0</b></div><div class="metric hp"><span>HEALTH</span><b id="hp">100%</b></div><div class="metric ammo"><span>AMMO</span><b id="ammo">12 / 96</b></div><div class="metric"><span>CREDITS</span><b id="credits">0</b></div></div></div>
+  <div class="arena">
+    <canvas id="game" width="960" height="540" aria-label="Spielbares Zombie-Survival-Spiel"></canvas>
+    <div class="touchpad" id="touchpad"><button class="blank">·</button><button data-move="w">▲</button><button class="blank">·</button><button data-move="a">◀</button><button data-move="s">▼</button><button data-move="d">▶</button></div>
+    <button class="touchfire" id="touchfire">FIRE</button>
+    <div class="overlay" id="endOverlay" hidden><div class="dialog"><div class="eyebrow">QUARANTINE REPORT</div><h2 id="endTitle">RUN OVER</h2><p id="endText">Der Sektor ist verloren.</p><button class="btn btn-green" id="restartEnd">↻ Neue Runde starten</button></div></div>
+    <div class="overlay" id="codeOverlay" hidden><div class="dialog"><div class="eyebrow">RESTRICTED ACCESS // 04</div><h2>Secret Console</h2><p>Gib den geheimen vierstelligen Zugangscode ein. Nur für das Easter-Egg dieser Spielrunde.</p><form id="codeForm"><div class="field"><input id="codeInput" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="••••" aria-label="Geheimcode"><button class="btn btn-cyber" type="submit">UNLOCK</button></div></form><div class="err" id="codeError"></div><div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn" id="closeCode" type="button">Schließen</button></div></div></div>
+    <div class="overlay" id="hackerOverlay" hidden><div class="dialog cyberdialog"><div class="eyebrow">ROOT CONSOLE // GAME EASTER EGG</div><h2>⌘ HACKER CONSOLE</h2><p>Lokale Gameplay-Modifikatoren für diese Spielwelt. Keine Verbindung zu fremden Spielen.</p><div class="hackerstatus"><span>ACCESS GRANTED · 6787</span><span id="consoleState">SYSTEM READY</span></div><div class="actions"><button class="action" data-action="heal"><b>♥ RESTORE VITALS</b><span>Gesundheit auf 100 % setzen</span></button><button class="action" data-action="boost"><b>⚡ OVERDRIVE</b><span>Temporärer Speed- und Fire-Boost</span></button><button class="action" data-action="purge"><b>⌁ PURGE WAVE</b><span>Aktuelle Gegnerwelle beseitigen</span></button><button class="action" data-action="credits"><b>◇ BONUS CREDITS</b><span>+500 Credits für Upgrades</span></button><button class="action" data-action="ammo"><b>▣ AMMO RESTOCK</b><span>Magazin und Reserve auffüllen</span></button><button class="action" data-action="night"><b>◉ NIGHT VISION</b><span>Nachtsicht umschalten</span></button></div><div class="screenmsg" id="consoleMsg" aria-live="polite"></div><div class="close-row"><span>6787 // EASTER EGG</span><button class="btn btn-cyber" id="closeHacker">CONSOLE SCHLIESSEN</button></div></div></div>
+  </div>
+  <div class="hudnote"><div class="message" id="status">Mission: Überlebe die Welle und sichere den Sektor.</div><div class="controls"><span><span class="key">WASD</span> bewegen</span><span><span class="key">Maus</span> zielen</span><span><span class="key">Klick</span> feuern</span><span><span class="key">R</span> laden</span></div></div>
+</section>
+<div class="footer">SPIELBARE PROTOTYP-DEMO · 6787 ist ein Game-Easter-Egg, kein sicherer Admin-Zugang · Benutze nur im eigenen Spiel.</div>
 </main>
 <script>
 (function(){
 "use strict";
-const c=document.getElementById("game"),ctx=c.getContext("2d"),scoreEl=document.getElementById("score"),hpEl=document.getElementById("hp"),stateEl=document.getElementById("state");
-let keys={},player,enemies,orbs,shots,score,hp,over,won,frame,mouse;
-function reset(){player={x:450,y:253,r:13,speed:3.7,hit:0};enemies=[];orbs=[];shots=[];score=0;hp=100;over=false;won=false;frame=0;mouse=null;keys={};for(let i=0;i<4;i++)spawnEnemy();for(let i=0;i<5;i++)spawnOrb();paintUI()}
-function spawnEnemy(){let edge=Math.floor(Math.random()*4),x=edge===0?15:edge===1?885:Math.random()*900,y=edge===2?15:edge===3?491:Math.random()*506;enemies.push({x,y,r:10+Math.random()*5,speed:.65+Math.random()*.4})}
-function spawnOrb(){orbs.push({x:30+Math.random()*840,y:30+Math.random()*446,r:7})}
-function paintUI(){scoreEl.textContent=score;hpEl.textContent=hp;stateEl.textContent=won?"GEWONNEN!":over?"GAME OVER":"Ziel: 15 Punkte"}
-function pos(e){let r=c.getBoundingClientRect();return{x:(e.clientX-r.left)*c.width/r.width,y:(e.clientY-r.top)*c.height/r.height}}
-c.addEventListener("pointerdown",e=>{c.setPointerCapture&&c.setPointerCapture(e.pointerId);mouse=pos(e);shoot(mouse)});
-c.addEventListener("pointermove",e=>{if(e.buttons)mouse=pos(e)});
-c.addEventListener("pointerup",()=>mouse=null);
-function shoot(t){if(over||won)return;let a=Math.atan2(t.y-player.y,t.x-player.x);shots.push({x:player.x,y:player.y,vx:Math.cos(a)*7,vy:Math.sin(a)*7,r:4,life:55})}
-window.addEventListener("keydown",e=>{let k=e.key.toLowerCase();keys[k]=true;if([" ","arrowup","arrowdown","arrowleft","arrowright"].includes(k))e.preventDefault();if(k===" "&&mouse)shoot(mouse)});
+const $=id=>document.getElementById(id),c=$("game"),ctx=c.getContext("2d");
+const W=c.width,H=c.height,keys=Object.create(null);
+let player,zombies,bullets,pickups,frame,wave,kills,credits,ammo,reserve,hp,remaining,spawnTicker,fireTicker,reloadTicker,over,won,mouse,fireHeld,slowUntil,boostUntil,nightVision,secretUnlocked;
+const buildings=[
+{x:32,y:35,w:145,h:65},{x:218,y:28,w:94,h:94},{x:707,y:28,w:130,h:70},{x:862,y:87,w:67,h:118},
+{x:27,y:376,w:125,h:110},{x:186,y:432,w:100,h:70},{x:725,y:414,w:170,h:80},{x:852,y:294,w:76,h:76},
+{x:360,y:38,w:54,h:40},{x:550,y:462,w:96,h:42}
+];
+function clamp(v,min,max){return Math.max(min,Math.min(max,v))}
+function rand(min,max){return min+Math.random()*(max-min)}
+function ui(){
+$("wave").textContent=String(wave).padStart(2,"0");$("kills").textContent=kills;$("hp").textContent=Math.max(0,Math.ceil(hp))+"%";$("ammo").textContent=ammo+" / "+reserve;$("credits").textContent=credits;
+}
+function message(s){$("status").textContent=s}
+function reset(){
+player={x:480,y:275,r:12,speed:3.2,hit:0,angle:0};
+zombies=[];bullets=[];pickups=[];frame=0;wave=1;kills=0;credits=0;ammo=12;reserve=96;hp=100;remaining=6;spawnTicker=12;fireTicker=0;reloadTicker=0;over=false;won=false;mouse={x:620,y:260};fireHeld=false;slowUntil=0;boostUntil=0;nightVision=false;secretUnlocked=false;
+$("endOverlay").hidden=true;$("hackerOverlay").hidden=true;$("codeOverlay").hidden=true;message("MISSION: Halte den Safehouse-Sektor. Die erste Welle kommt.");ui();
+}
+function spawnZombie(){
+let side=Math.floor(Math.random()*4),x=side===0?-10:side===1?W+10:rand(0,W),y=side===2?-10:side===3?H+10:rand(0,H);
+const boss=wave%5===0&&remaining===1,type=boss?"BOSS":(Math.random()<.25?"RUNNER":"WALKER");
+zombies.push({x,y,r:boss?21:type==="RUNNER"?10:13,hp:boss?12+wave*2:type==="RUNNER"?1:2,maxHp:boss?12+wave*2:type==="RUNNER"?1:2,speed:(boss?.42:type==="RUNNER"?1.18:.63)+Math.min(wave*.035,.55),type,hit:0,attack:0,phase:Math.random()*6});
+}
+function spawnPickup(x,y,type){pickups.push({x,y,type,r:9,life:700,spin:Math.random()*5})}
+function fire(){
+if(over||won||reloadTicker>0||fireTicker>0)return;
+if(ammo<=0){message("MAGAZIN LEER — drücke R zum Nachladen.");startReload();return}
+ammo--;fireTicker=frame<boostUntil?5:12;
+const angle=Math.atan2(mouse.y-player.y,mouse.x-player.x),spread=(Math.random()-.5)*.055;
+bullets.push({x:player.x+Math.cos(angle)*15,y:player.y+Math.sin(angle)*15,vx:Math.cos(angle+spread)*9,vy:Math.sin(angle+spread)*9,life:65,damage:frame<boostUntil?2:1});
+ui();
+}
+function startReload(){if(reloadTicker||ammo===12||reserve<=0)return;reloadTicker=38;message("RELOADING …")}
+function action(a){
+if(!secretUnlocked)return;
+if(a==="heal"){hp=100;message("CONSOLE: VITALS RESTORED.")}
+else if(a==="boost"){boostUntil=frame+650;player.speed=5.2;message("CONSOLE: OVERDRIVE AKTIV — 10 SEKUNDEN.")}
+else if(a==="purge"){kills+=zombies.length;credits+=zombies.length*12;zombies=[];remaining=0;spawnTicker=0;message("CONSOLE: AKTUELLE WELLE GESÄUBERT.");}
+else if(a==="credits"){credits+=500;message("CONSOLE: +500 BONUS CREDITS GUTGESCHRIEBEN.")}
+else if(a==="ammo"){ammo=12;reserve=Math.min(999,reserve+48);message("CONSOLE: MUNITION AUFGEFÜLLT.")}
+else if(a==="night"){nightVision=!nightVision;message("CONSOLE: NIGHT VISION "+(nightVision?"ONLINE":"OFFLINE")+".")}
+$("consoleState").textContent="COMMAND "+a.toUpperCase()+" OK";$("consoleMsg").textContent="✓ "+messageText(a);ui();
+}
+function messageText(a){return ({heal:"Vitals auf 100 % gesetzt.",boost:"Overdrive aktiviert.",purge:"Sektor bereinigt.",credits:"500 Credits gutgeschrieben.",ammo:"Munition aufgefüllt.",night:nightVision?"Nachtsicht aktiviert.":"Nachtsicht deaktiviert."})[a]||"Aktion ausgeführt."}
+function unlockCode(e){e.preventDefault();if($("codeInput").value==="6787"){secretUnlocked=true;$("codeOverlay").hidden=true;$("hackerOverlay").hidden=false;$("codeError").textContent="";$("consoleMsg").textContent="ACCESS GRANTED — Willkommen zurück.";message("SECRET CONSOLE UNLOCKED.");}else{$("codeError").textContent="ACCESS DENIED — Code ungültig.";$("codeInput").select()}}
+$("codeForm").addEventListener("submit",unlockCode);
+$("secretBtn").onclick=()=>{if(secretUnlocked){$("hackerOverlay").hidden=false}else{$("codeOverlay").hidden=false;$("codeInput").value="";$("codeError").textContent="";setTimeout(()=>$("codeInput").focus(),40)}};
+$("closeCode").onclick=()=>$("codeOverlay").hidden=true;$("closeHacker").onclick=()=>$("hackerOverlay").hidden=true;
+document.querySelectorAll("[data-action]").forEach(b=>b.addEventListener("click",()=>action(b.dataset.action)));
+$("restartTop").onclick=reset;$("restartEnd").onclick=reset;
+function pointer(e){const r=c.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height}}
+c.addEventListener("pointermove",e=>mouse=pointer(e));
+c.addEventListener("pointerdown",e=>{mouse=pointer(e);if(e.pointerType==="touch"){fireHeld=true;fire()}else{fireHeld=true;fire()}});
+c.addEventListener("pointerup",()=>fireHeld=false);c.addEventListener("pointercancel",()=>fireHeld=false);c.addEventListener("contextmenu",e=>e.preventDefault());
+window.addEventListener("keydown",e=>{const k=e.key.toLowerCase();keys[k]=true;if([" ","arrowup","arrowdown","arrowleft","arrowright"].includes(k))e.preventDefault();if(k==="r")startReload();if(k==="escape"){$("codeOverlay").hidden=true;$("hackerOverlay").hidden=true}});
 window.addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
-document.getElementById("restart").onclick=reset;
-function circle(x,y,r,color){ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fillStyle=color;ctx.fill()}
-function draw(){
-ctx.clearRect(0,0,c.width,c.height);ctx.fillStyle="#0c1927";ctx.fillRect(0,0,c.width,c.height);ctx.strokeStyle="#16283a";ctx.lineWidth=1;
-for(let x=0;x<c.width;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,c.height);ctx.stroke()}
-for(let y=0;y<c.height;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(c.width,y);ctx.stroke()}
-if(!over&&!won){
-frame++;let dx=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0),dy=(keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0),len=Math.hypot(dx,dy)||1;
-player.x=Math.max(15,Math.min(885,player.x+dx/len*player.speed));player.y=Math.max(15,Math.min(491,player.y+dy/len*player.speed));
-if(frame%95===0&&enemies.length<14)spawnEnemy();if(frame%115===0&&orbs.length<8)spawnOrb();
-for(let en of enemies){let a=Math.atan2(player.y-en.y,player.x-en.x);en.x+=Math.cos(a)*en.speed;en.y+=Math.sin(a)*en.speed;if(Math.hypot(player.x-en.x,player.y-en.y)<player.r+en.r&&player.hit===0){hp=Math.max(0,hp-12);player.hit=32}}
-if(player.hit>0)player.hit--;
-for(let s of shots){s.x+=s.vx;s.y+=s.vy;s.life--;for(let i=enemies.length-1;i>=0;i--){let en=enemies[i];if(Math.hypot(s.x-en.x,s.y-en.y)<s.r+en.r){enemies.splice(i,1);s.life=0;score++;break}}}
-shots=shots.filter(s=>s.life>0&&s.x>-10&&s.x<910&&s.y>-10&&s.y<516);
-for(let i=orbs.length-1;i>=0;i--){if(Math.hypot(player.x-orbs[i].x,player.y-orbs[i].y)<player.r+orbs[i].r){orbs.splice(i,1);hp=Math.min(100,hp+16);score++}}
-if(hp<=0)over=true;if(score>=15)won=true;paintUI()
+document.querySelectorAll("[data-move]").forEach(b=>{const k=b.dataset.move;b.addEventListener("pointerdown",e=>{e.preventDefault();keys[k]=true});["pointerup","pointerleave","pointercancel"].forEach(ev=>b.addEventListener(ev,()=>keys[k]=false))});
+$("touchfire").addEventListener("pointerdown",e=>{e.preventDefault();fireHeld=true;fire()});["pointerup","pointerleave","pointercancel"].forEach(ev=>$("touchfire").addEventListener(ev,()=>fireHeld=false));
+function circle(x,y,r,fill){ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fillStyle=fill;ctx.fill()}
+function drawBackground(){
+const sky=ctx.createLinearGradient(0,0,0,H);sky.addColorStop(0,"#101e2a");sky.addColorStop(.55,"#0b151d");sky.addColorStop(1,"#101a1c");ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+ctx.fillStyle="#202d31";ctx.fillRect(0,0,W,H);
+ctx.strokeStyle="#253338";ctx.lineWidth=1;for(let x=0;x<W;x+=42){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}for(let y=0;y<H;y+=42){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+ctx.fillStyle="#111b20";ctx.fillRect(0,0,W,H);
+ctx.fillStyle="#30383a";ctx.fillRect(0,0, W, H);
+ctx.fillStyle="#151d22";ctx.fillRect(0,212,W,120);
+ctx.fillStyle="#e2b76b";ctx.globalAlpha=.65;for(let x=12;x<W;x+=56){ctx.fillRect(x,269,24,3)}ctx.globalAlpha=1;
+buildings.forEach((b,i)=>{ctx.fillStyle="#0e171e";ctx.fillRect(b.x+5,b.y+7,b.w,b.h);ctx.fillStyle=["#273037","#303439","#26333a","#292f35"][i%4];ctx.fillRect(b.x,b.y,b.w,b.h);ctx.strokeStyle="#46535a";ctx.strokeRect(b.x,b.y,b.w,b.h);ctx.fillStyle="#121b24";for(let wx=b.x+10;wx<b.x+b.w-8;wx+=23)for(let wy=b.y+10;wy<b.y+b.h-6;wy+=20){ctx.fillRect(wx,wy,10,7);if((Math.floor(wx+wy)%4)===0){ctx.fillStyle="#dba75a";ctx.fillRect(wx,wy,10,7);ctx.fillStyle="#121b24"}}ctx.fillStyle="#4a4f4d";ctx.fillRect(b.x+b.w*.17,b.y+b.h*.65, b.w*.25,6);});
+for(let i=0;i<18;i++){let x=(i*71+frame*.2)%W,y=(i*113+frame*.65)%H;ctx.strokeStyle="#9cc8d033";ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-4,y+11);ctx.stroke()}
+ctx.fillStyle="#0c2824";ctx.fillRect(420,420,120,72);ctx.strokeStyle="#49d99e";ctx.strokeRect(420,420,120,72);ctx.fillStyle="#9df2bd";ctx.font="bold 9px system-ui";ctx.textAlign="center";ctx.fillText("SAFEHOUSE",480,457);
 }
-for(let o of orbs)circle(o.x,o.y,o.r,"#70f2b0");
-for(let en of enemies){circle(en.x,en.y,en.r,"#ff5875");circle(en.x-3,en.y-2,2,"#fff")}
-for(let s of shots)circle(s.x,s.y,s.r,"#9bd5ff");
-circle(player.x,player.y,player.r,player.hit&&Math.floor(player.hit/4)%2?"#fff":"#66b8ff");ctx.beginPath();ctx.arc(player.x,player.y,player.r+6,0,Math.PI*2);ctx.strokeStyle="#66b8ff66";ctx.stroke();
-if(over||won){ctx.fillStyle="#07101ddc";ctx.fillRect(0,0,c.width,c.height);ctx.fillStyle=won?"#82f4bd":"#ff8096";ctx.textAlign="center";ctx.font="bold 42px system-ui";ctx.fillText(won?"LEVEL GESCHAFFT!":"GAME OVER",450,238);ctx.fillStyle="#e6f0ff";ctx.font="18px system-ui";ctx.fillText("Score: "+score+" · Drücke Neu starten",450,276)}
-requestAnimationFrame(draw)
+function drawZombie(z){
+ctx.save();ctx.translate(z.x,z.y);ctx.rotate(Math.sin(frame*.03+z.phase)*.11);
+const c=z.type==="BOSS"?"#ac3b4c":z.type==="RUNNER"?"#b6b36d":"#697d68";
+ctx.shadowColor=z.type==="BOSS"?"#ff394b":"#67e6a1";ctx.shadowBlur=z.type==="BOSS"?14:4;
+circle(0,2,z.r,c);ctx.shadowBlur=0;ctx.fillStyle="#293932";ctx.fillRect(-z.r*.74,-z.r*.12,z.r*1.5,z.r*.95);
+circle(-z.r*.3,-z.r*.19,Math.max(2,z.r*.13),"#ff485e");circle(z.r*.3,-z.r*.19,Math.max(2,z.r*.13),"#ff485e");
+ctx.strokeStyle="#d7d2b5";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-z.r*.4,z.r*.28);ctx.lineTo(z.r*.4,z.r*.28);ctx.stroke();
+if(z.type==="BOSS"){ctx.strokeStyle="#ff7385";ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,z.r+5,0,Math.PI*2);ctx.stroke()}
+ctx.restore();
+if(z.hp<z.maxHp){ctx.fillStyle="#3d252c";ctx.fillRect(z.x-z.r,z.y-z.r-8,z.r*2,3);ctx.fillStyle="#ff687e";ctx.fillRect(z.x-z.r,z.y-z.r-8,z.r*2*(z.hp/z.maxHp),3)}
 }
-reset();draw()
+function finishRun(win){over=!win;won=win;$("endTitle").textContent=win?"SEKTOR GESICHERT":"RUN OVER";$("endText").textContent=win?"Welle "+wave+" gesichert. Du hast "+kills+" Zombies eliminiert.":"Du hast "+kills+" Zombies eliminiert und "+credits+" Credits gesammelt."; $("endOverlay").hidden=false}
+function step(){
+requestAnimationFrame(step);frame++;if(!over&&!won){
+if(keys.w||keys.arrowup)player.y-=player.speed;if(keys.s||keys.arrowdown)player.y+=player.speed;if(keys.a||keys.arrowleft)player.x-=player.speed;if(keys.d||keys.arrowright)player.x+=player.speed;player.x=clamp(player.x,15,W-15);player.y=clamp(player.y,15,H-15);
+player.angle=Math.atan2(mouse.y-player.y,mouse.x-player.x);
+if(fireHeld&&frame%6===0)fire();if(fireTicker>0)fireTicker--;if(reloadTicker>0&&--reloadTicker===0){let n=Math.min(12-ammo,reserve);ammo+=n;reserve-=n;message("Magazin geladen.");ui()}
+if(frame%Math.max(20,75-wave*3)===0&&remaining>0){spawnZombie();remaining--}
+let slow=frame<slowUntil?.32:1;
+for(let z of zombies){const a=Math.atan2(player.y-z.y,player.x-z.x),speed=z.speed*slow;z.x+=Math.cos(a)*speed;z.y+=Math.sin(a)*speed;if(z.hit>0)z.hit--;if(Math.hypot(player.x-z.x,player.y-z.y)<player.r+z.r&&z.attack<=0){hp=Math.max(0,hp-(z.type==="BOSS"?9: z.type==="RUNNER"?6:4));z.attack=48;player.hit=10;ui()}if(z.attack>0)z.attack--}
+for(let b of bullets){b.x+=b.vx;b.y+=b.vy;b.life--;for(let i=zombies.length-1;i>=0;i--){let z=zombies[i];if(Math.hypot(b.x-z.x,b.y-z.y)<z.r+3){z.hp-=b.damage;b.life=0;if(z.hp<=0){zombies.splice(i,1);kills++;credits+=z.type==="BOSS"?150:z.type==="RUNNER"?18:12;if(Math.random()<.13)spawnPickup(z.x,z.y,Math.random()<.55?"med":"ammo");if(z.type==="BOSS"){message("BOSS ELIMINIERT — +150 CREDITS")}ui()}break}}}
+bullets=bullets.filter(b=>b.life>0&&b.x>-20&&b.x<W+20&&b.y>-20&&b.y<H+20);
+for(let i=pickups.length-1;i>=0;i--){const p=pickups[i];p.life--;p.spin+=.04;if(Math.hypot(player.x-p.x,player.y-p.y)<player.r+p.r){if(p.type==="med"){hp=Math.min(100,hp+24);message("Medkit gesammelt · +24 HP")}else{reserve=Math.min(999,reserve+24);message("Munition eingesammelt · +24")}pickups.splice(i,1);ui()}else if(p.life<=0)pickups.splice(i,1)}
+if(frame<boostUntil){player.speed=5.2}else player.speed=3.2;
+if(hp<=0)finishRun(false);
+if(remaining===0&&zombies.length===0){wave++;remaining=4+wave*2;spawnTicker=30;credits+=40+wave*5;hp=Math.min(100,hp+5);message("WELLE "+(wave-1)+" GESCHAFFT · Bonus-Credits +"+(40+(wave-1)*5));if(wave>20)finishRun(true);ui()}
+if(spawnTicker>0)spawnTicker--;
+}
+drawBackground();
+for(const p of pickups){ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.spin);ctx.shadowColor=p.type==="med"?"#79f0af":"#71ddff";ctx.shadowBlur=13;ctx.fillStyle=p.type==="med"?"#45d88d":"#45bfe8";ctx.fillRect(-7,-7,14,14);ctx.shadowBlur=0;ctx.fillStyle="#effff5";ctx.font="bold 12px system-ui";ctx.textAlign="center";ctx.fillText(p.type==="med"?"+":"•",0,4);ctx.restore()}
+zombies.forEach(drawZombie);for(const b of bullets){ctx.shadowColor="#ffd37b";ctx.shadowBlur=10;circle(b.x,b.y,3,"#ffdb91");ctx.shadowBlur=0}
+ctx.save();ctx.translate(player.x,player.y);ctx.rotate(player.angle);ctx.shadowColor="#6feaff";ctx.shadowBlur=15;circle(0,0,12,player.hit>0?"#fff":"#6dd7e9");ctx.shadowBlur=0;ctx.fillStyle="#263f4b";ctx.fillRect(-7,-7,13,14);ctx.fillStyle="#8cfff3";ctx.fillRect(3,-3,18,6);ctx.restore();
+if(nightVision){ctx.fillStyle="#2cff9b16";ctx.fillRect(0,0,W,H);ctx.strokeStyle="#64ffb944";ctx.lineWidth=2;ctx.strokeRect(8,8,W-16,H-16)}
+ctx.fillStyle="#e4f0f7";ctx.font="bold 10px ui-monospace,monospace";ctx.textAlign="left";ctx.fillText("SECTOR 07 // "+(wave%5===0?"BOSS SIGNAL":"QUARANTINE BREACH"),18,20);
+if(boostUntil>frame){ctx.fillStyle="#83f1e8";ctx.fillText("OVERDRIVE "+Math.ceil((boostUntil-frame)/60)+"s",18,37)}
+if(slowUntil>frame){ctx.fillStyle="#c6ff96";ctx.fillText("CHRONO FIELD",18,53)}
+ctx.strokeStyle="#7d98a6";ctx.globalAlpha=.4;ctx.strokeRect(7,7,W-14,H-14);ctx.globalAlpha=1;
+if(reloadTicker>0){ctx.fillStyle="#ffd28c";ctx.textAlign="center";ctx.font="bold 12px system-ui";ctx.fillText("RELOADING…",W/2,30)}
+}
+reset();for(let i=0;i<3;i++)spawnZombie();step();
 })();
-</script></body></html>
+</script>
+</body>
+</html>
