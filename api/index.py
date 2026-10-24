@@ -2,7 +2,7 @@ import os, json, re, hmac, uuid, html as html_lib
 import xml.etree.ElementTree as ET
 from pathlib import Path
 import requests
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, Response, jsonify, render_template, request
 from werkzeug.exceptions import RequestEntityTooLarge
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -84,7 +84,7 @@ def normalize_html(source):
     lower = text.lower()
     if "<script" not in lower or "</script>" not in lower:
         raise ValueError("Die HTML-Demo enthält kein vollständiges JavaScript.")
-    if not re.search(r"<!doctype\\s+html|<html(?:\\s|>)", lower):
+    if not ("<!doctype html" in lower or "<html" in lower):
         text = "<!doctype html><html lang=\"de\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Game KI Demo</title></head><body>" + text + "</body></html>"
     elif "</html>" not in lower:
         text += "\\n</body></html>"
@@ -96,7 +96,7 @@ def game_fallback(prompt):
         page = path.read_text(encoding="utf-8")
     except OSError:
         page = "<!doctype html><html><head><meta charset='utf-8'></head><body><canvas id='g' width='720' height='400'></canvas><script>let c=document.querySelector('canvas'),x=c.getContext('2d'),p={x:360,y:200};onkeydown=e=>{p.x+=e.key==='ArrowRight'?10:e.key==='ArrowLeft'?-10:0;p.y+=e.key==='ArrowDown'?10:e.key==='ArrowUp'?-10:0;x.clearRect(0,0,720,400);x.fillStyle='#6cf';x.fillRect(p.x,p.y,25,25)};x.fillStyle='#6cf';x.fillRect(p.x,p.y,25,25)</script></body></html>"
-    title = html_lib.escape(re.sub(r"\\s+", " ", (prompt or "Survival Arena")).strip()[:72])
+    title = html_lib.escape(" ".join((prompt or "Survival Arena").split())[:72])
     return page.replace("Game KI · Survival Arena", title or "Game KI · Survival Arena")
 
 def ensure_playable(prompt, provider, data):
@@ -127,7 +127,7 @@ def roblox_env():
     place = os.environ.get("ROBLOX_PLACE_ID", "").strip()
     if not all((key, universe, place)):
         raise RuntimeError("ROBLOX_API_KEY, ROBLOX_UNIVERSE_ID und ROBLOX_PLACE_ID müssen in Vercel gesetzt sein.")
-    if not re.fullmatch(r"\\d{1,24}", universe) or not re.fullmatch(r"\\d{1,24}", place):
+    if not (universe.isdigit() and 1 <= len(universe) <= 24) or not (place.isdigit() and 1 <= len(place) <= 24):
         raise ValueError("Roblox-IDs müssen numerisch sein.")
     return key, universe, place
 
@@ -208,6 +208,14 @@ def publish_bytes(payload, content_type="application/xml"):
 @app.get("/")
 def home():
     return render_template("index.html")
+
+@app.get("/starter-game")
+def starter_game():
+    response = Response(game_fallback("Survival Arena"), mimetype="text/html")
+    response.headers["Content-Security-Policy"] = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 @app.get("/status")
 def status():
