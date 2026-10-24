@@ -516,6 +516,36 @@ def status():
     })
 
 
+@app.get("/resolve-place")
+def resolve_place():
+    """Resolve a Roblox Place ID to its owning Universe ID using Roblox's public endpoint."""
+    if not authorized():
+        return auth_error()
+    place = str(request.args.get("place_id", "")).strip()
+    if not (place.isdigit() and 1 <= len(place) <= 24):
+        return err("Place ID muss eine gültige Zahl sein.", 400)
+    try:
+        response = requests.get(
+            "https://apis.roblox.com/universes/v1/places/" + place + "/universe",
+            timeout=(5, 12),
+        )
+        if response.status_code == 404:
+            return err("Roblox findet zu dieser Place ID keine Experience. Prüfe die ID.", 404)
+        if not response.ok:
+            return err("Roblox konnte die Universe ID gerade nicht ermitteln (HTTP " + str(response.status_code) + ").", 502)
+        payload = response.json()
+        universe = str(payload.get("universeId", "")).strip()
+        if not (universe.isdigit() and 1 <= len(universe) <= 24):
+            return err("Roblox hat keine gültige Universe ID für diese Place ID zurückgegeben.", 502)
+        return jsonify({"place_id": place, "universe_id": universe})
+    except requests.Timeout:
+        return err("Zeitüberschreitung beim Ermitteln der Universe ID. Versuche es erneut.", 504)
+    except requests.RequestException:
+        return err("Roblox ist gerade nicht erreichbar, um die Universe ID zu ermitteln.", 502)
+    except (ValueError, TypeError):
+        return err("Roblox hat ungültige Daten für diese Place ID zurückgegeben.", 502)
+
+
 @app.get("/roblox-preview")
 def roblox_preview():
     if not authorized():
