@@ -113,6 +113,105 @@ def ai(prompt, provider):
                                            temperature=0.2, max_output_tokens=48000))
     return response.text
 
+
+ROBLOX_COMPONENT_SYSTEM = """You are a senior Roblox Studio and Luau gameplay engineer.
+Return ONLY raw Roblox Luau source code, not JSON and not Markdown code fences.
+The output must contain two complete scripts separated with these exact marker lines:
+--[[GAME_KI_SERVER_SCRIPT]]
+<server Script source>
+--[[GAME_KI_CLIENT_SCRIPT]]
+<client LocalScript source>
+
+Create a real playable Roblox experience using Roblox's actual engine. The editable 3D scene already exists in Workspace; do not delete, replace, or duplicate it. Use the real Roblox Character, Humanoid and HumanoidRootPart with the normal Roblox third-person camera and default movement controls. Do not replace the avatar or fake the game as a GUI.
+
+Server code owns real gameplay state, NPCs/enemies, damage, rewards, objectives, respawn and win/lose logic. Use actual Roblox Instances, Models, Parts and Humanoids as appropriate. Create RemoteEvents under ReplicatedStorage on the server before the client waits for them. Validate all client requests on the server, rate-limit action events and never trust client-provided health, rewards or enemy state. Implement a useful full loop (join, spawn, play, progress, die/win, respawn/restart). Avoid unbounded loops and clean up connections/instances.
+
+Client code builds a native Roblox HUD under PlayerGui with ScreenGui, Frames, TextLabels and functional TextButtons; use responsive scale/constraints for PC and mobile. Interact with server-authoritative gameplay through the RemoteEvents. Do not create HTML/browser elements in Roblox. Use correct Roblox APIs; don't depend on external assets, packages, external require IDs, remote code loading, exploit tools or placeholders.
+
+For zombie/survival/horror games, implement escalating zombie waves, distinct enemy types, health, ammo/reload, pickups, credits/XP, safehouse and a stronger boss every few waves. Use actual in-game NPCs and reliable targeting/collisions.
+When the user's prompt requests the 6787 secret/hacker console, include a visible locked button, a code-entry panel accepting exactly 6787, and working HEAL/RESTORE, OVERDRIVE, PURGE WAVE, BONUS CREDITS, AMMO and NIGHT VISION actions. Validate the code and allowlisted actions on the server, keep unlock state per player, rate-limit calls, and only affect this game's state. This is an intentional game easter egg, not a tool for other Roblox games.
+Keep code complete but concise enough to execute reliably. Respect the user's specific game idea. No TODOs or fake claims.
+"""
+
+WEB_COMPONENT_SYSTEM = """You are an expert HTML5 gameplay engineer. Return ONLY a complete standalone HTML document, starting with <!doctype html>. No Markdown fences, no JSON wrapper and no explanation.
+Build an immediately playable, polished browser demo that matches the user's game idea. Inline CSS and JavaScript only: no external dependencies, assets, fonts, network calls, fetch, WebSocket, cookies, localStorage or dynamic imports. The game must have a real gameplay loop: responsive playfield, character movement, input/attack or interaction, collision/obstacles, enemies/objectives, health/progress feedback, win/lose or round progression and restart. Support keyboard and pointer/touch with usable mobile controls.
+When the user's prompt requests zombie survival, implement escalating zombie waves, ammo/reload, health, pickups, progress/rewards, tougher boss waves and a visibly playable ruined-city/safehouse setting.
+When the user's prompt requests the 6787 secret/hacker console, implement a working initially locked console, a code input accepting exactly 6787, and functional HEAL/RESTORE, OVERDRIVE, PURGE WAVE, BONUS CREDITS, AMMO and NIGHT VISION modifiers with feedback. These actions may only affect this browser demo.
+Make the controls and objective obvious. Avoid static mockups; ensure the canvas/game loop is fully implemented and restart works. Keep HTML compact enough to fit in a single response.
+"""
+
+def _strip_generated_fence(raw, kind):
+    text = (raw or "").strip()
+    if text.startswith(chr(96) * 3):
+        lines = text.splitlines()
+        if lines:
+            lines = lines[1:]
+        if lines and lines[-1].strip().startswith(chr(96) * 3):
+            lines = lines[:-1]
+        text = "\\n".join(lines).strip()
+    if kind == "html" and not text.lower().startswith("<!doctype html") and "<html" in text.lower():
+        text = text[text.lower().find("<html"):]
+    return text
+
+def ai_component(prompt, provider, kind):
+    """Generate one artifact as raw text to avoid serializing huge code/HTML into one JSON response."""
+    if kind == "roblox":
+        instruction, max_tokens = ROBLOX_COMPONENT_SYSTEM, 16000
+    elif kind == "html":
+        instruction, max_tokens = WEB_COMPONENT_SYSTEM, 16000
+    else:
+        raise ValueError("Unbekannter Generierungsbaustein.")
+    if provider == "groq":
+        from groq import Groq
+        key = os.environ.get("GROQ_API_KEY", "").strip()
+        if not key:
+            raise RuntimeError("GROQ_API_KEY fehlt in Vercel.")
+        response = Groq(api_key=key, timeout=55, max_retries=0).chat.completions.create(
+            model=os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b"),
+            messages=[{"role": "system", "content": instruction},
+                      {"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_completion_tokens=max_tokens,
+        )
+        raw = response.choices[0].message.content
+    else:
+        from google import genai
+        from google.genai import types
+        key = os.environ.get("GEMINI_API_KEY", "").strip()
+        if not key:
+            raise RuntimeError("GEMINI_API_KEY fehlt in Vercel.")
+        response = genai.Client(api_key=key).models.generate_content(
+            model=os.environ.get("GEMINI_MODEL", "gemini-3.8-flash"),
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=instruction,
+                temperature=0.2,
+                max_output_tokens=max_tokens,
+            ),
+        )
+        raw = response.text
+    result = _strip_generated_fence(raw, kind)
+    if not result:
+        raise ValueError(("Roblox-Luau" if kind == "roblox" else "HTML-Demo") + " blieb leer.")
+    return result
+
+def generate_components(prompt, provider):
+    """Generate Roblox scripts and the browser demo independently, in parallel, without huge JSON escaping."""
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        code_job = pool.submit(ai_component, prompt, provider, "roblox")
+        html_job = pool.submit(ai_component, prompt, provider, "html")
+        roblox_code = code_job.result()
+        web_simulation = html_job.result()
+    return {
+        "roblox_code": roblox_code,
+        "web_simulation": normalize_html(web_simulation),
+        # The scene is serialized directly into the Roblox place. Genre-aware scenes
+        # ensure a usable physical level even if a model response omits geometry.
+        "roblox_scene": default_scene(prompt),
+    }
+
+
 def parse_ai(raw):
     text = (raw or "").strip()
     ticks = chr(96) * 3
@@ -606,45 +705,50 @@ def generate():
         if not all(isinstance(x, str) for x in (code, web_demo, original)) or len(code) > 100000 or len(web_demo) > 100000:
             return err("Projektkontext ungültig oder zu groß.", 413)
         if code or web_demo:
-            scene_context=previous.get("roblox_scene")
-            scene_text=json.dumps(scene_context,ensure_ascii=False)[:16000] if isinstance(scene_context,(dict,list)) else ""
-            prompt=("Erweitere das bestehende Projekt, starte nicht neu. Ursprünglicher Auftrag: "+original[:4000]+
-                    "\nBisheriger Luau-Code:\n"+code+"\nBisherige HTML-Demo:\n"+web_demo+
-                    "\nBisherige editierbare Roblox-Szene:\n"+scene_text+"\nNeue Änderung:\n"+prompt)
+            scene_context = previous.get("roblox_scene")
+            scene_text = json.dumps(scene_context, ensure_ascii=False)[:16000] if isinstance(scene_context, (dict, list)) else ""
+            prompt = ("Erweitere das bestehende Projekt, starte nicht neu. Ursprünglicher Auftrag: " + original[:4000]
+                      + "\\nBisheriger Luau-Code:\\n" + code[:35000]
+                      + "\\nBisherige HTML-Demo:\\n" + web_demo[:35000]
+                      + "\\nBisherige editierbare Roblox-Szene:\\n" + scene_text
+                      + "\\nNeue Änderung:\\n" + prompt)
+
     try:
-        try:
-            result = parse_ai(ai(prompt.strip(), provider))
-        except ValueError:
-            result = parse_ai(ai("Return a valid JSON object with roblox_code and web_simulation for this request, with complete runnable HTML. No Markdown. Request:\n" + prompt[:10000], provider))
-        result=ensure_playable(prompt.strip(),provider,result)
+        result = generate_components(prompt.strip(), provider)
         try:
             validate_roblox_scripts(result["roblox_code"])
             validate_secret_console(prompt.strip(), result)
         except ValueError as initial_error:
-            repair_prompt=("Repair this game build before returning it. Return one valid JSON object with roblox_code, web_simulation, roblox_scene. "
-                "Keep a complete playable HTML game and complete separate Roblox server/client scripts, no placeholders. "
-                "Preserve the existing level and gameplay. If the prompt requests the 6787 Zombie/Hacker Console, it MUST be a working in-game easter egg: "
-                "the browser build has a code input and a working hacker-console panel with restore/heal, overdrive, purge wave, credits, ammo and night vision; "
-                "the Roblox build has the same UI and server-validated, rate-limited actions through a RemoteEvent. Do not make exploits for other Roblox games. "
-                "Request:\n"+prompt.strip()[:4500]+"\nValidation issue:\n"+str(initial_error)+
-                "\nCurrent code:\n"+result["roblox_code"][:55000]+"\nCurrent demo:\n"+result["web_simulation"][:50000]+
-                "\nScene JSON:\n"+json.dumps(result["roblox_scene"],ensure_ascii=False)[:12000])
-            repaired=parse_ai(ai(repair_prompt,provider))
-            repaired["web_simulation"]=normalize_html(repaired["web_simulation"])
-            repaired["roblox_scene"]=normalize_scene(repaired.get("roblox_scene") or result.get("roblox_scene"),prompt.strip())
+            repair_prompt = (
+                "Repair the following existing game without changing its idea. Return raw artifacts, NOT JSON. "
+                "Fix the validation issue: " + str(initial_error)
+                + "\\nRequested game:\\n" + prompt.strip()[:3500]
+                + "\\nCurrent Roblox scripts:\\n" + result["roblox_code"][:24000]
+                + "\\nCurrent browser demo:\\n" + result["web_simulation"][:24000]
+                + "\\nReturn complete updated Roblox Luau scripts with both exact markers and a complete standalone playable HTML5 game."
+            )
+            repaired = generate_components(repair_prompt, provider)
             validate_roblox_scripts(repaired["roblox_code"])
             validate_secret_console(prompt.strip(), repaired)
-            result=repaired
-        return jsonify({"roblox_code":result["roblox_code"],
-                        "web_simulation":result["web_simulation"],
-                        "roblox_scene":result["roblox_scene"]})
+            result = repaired
+        return jsonify({
+            "roblox_code": result["roblox_code"],
+            "web_simulation": result["web_simulation"],
+            "roblox_scene": result["roblox_scene"],
+        })
     except RuntimeError as exc:
         return err(str(exc), 503)
     except ValueError as exc:
         return err(str(exc), 502)
     except Exception as exc:
+        message = str(exc)
         app.logger.warning("AI provider %s failed: %s", provider, type(exc).__name__)
-        return err("KI-Generierung fehlgeschlagen: " + str(exc)[:250], 502)
+        lower = message.lower()
+        if "json_validate_failed" in lower or "failed to generate json" in lower:
+            return err("Der KI-Anbieter hat das große JSON-Paket abgelehnt. Bitte erneut versuchen; die getrennte Generierung sollte diesen Fehler vermeiden.", 502)
+        if "timeout" in lower or "timed out" in lower or "deadline" in lower:
+            return err("Die KI hat zu lange gebraucht. Versuche es mit einer kürzeren Spielbeschreibung erneut.", 504)
+        return err("KI-Generierung fehlgeschlagen (" + provider + "): " + message[:180], 502)
 
 @app.post("/publish-generated")
 def publish_generated():
