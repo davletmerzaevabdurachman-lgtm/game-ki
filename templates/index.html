@@ -183,7 +183,7 @@ function robloxConfig(){return {api_key:$("robloxApi").value.trim()||sessionStor
 function hasRobloxConfig(c){return !!(c.api_key&&/^\d{1,24}$/.test(c.universe_id)&&/^\d{1,24}$/.test(c.place_id))}
 async function resolveUniverseFromPlace(){
   var place=$("placeId").value.trim();
-  if(!/^\\d{1,24}$/.test(place)||$("universeId").value.trim())return;
+  if(!/^\d{1,24}$/.test(place)||$("universeId").value.trim())return;
   if(!($("password").value.trim()||sessionStorage.getItem("gamekiPassword")))return;
   try{
     var r=await fetch("/resolve-place?place_id="+encodeURIComponent(place),{headers:requestHeaders(),cache:"no-store"});
