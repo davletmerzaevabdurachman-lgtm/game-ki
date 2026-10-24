@@ -122,14 +122,23 @@ def ensure_playable(prompt, provider, data):
             return data
 
 def roblox_env(config=None):
+    """Resolve Roblox Open Cloud settings from the publish request or server env.
+    The browser-provided API key is used only for the current publish request and
+    is never forwarded to either AI provider or written to server-side storage.
+    """
     config = config if isinstance(config, dict) else {}
-    key = os.environ.get("ROBLOX_API_KEY", "").strip()
+    key = str(config.get("api_key") or os.environ.get("ROBLOX_API_KEY", "")).strip()
     universe = str(config.get("universe_id") or os.environ.get("ROBLOX_UNIVERSE_ID", "")).strip()
     place = str(config.get("place_id") or os.environ.get("ROBLOX_PLACE_ID", "")).strip()
     if not all((key, universe, place)):
-        raise RuntimeError("ROBLOX_API_KEY, ROBLOX_UNIVERSE_ID und ROBLOX_PLACE_ID müssen in Vercel gesetzt sein.")
+        raise RuntimeError(
+            "Trage Roblox API-Key, Universe-ID und Place-ID in den Studio-Einstellungen ein "
+            "oder konfiguriere die ROBLOX_* Variablen in Vercel."
+        )
+    if len(key) > 1024 or any(ord(ch) < 32 for ch in key):
+        raise ValueError("Der Roblox API-Key hat ein ungültiges Format.")
     if not (universe.isdigit() and 1 <= len(universe) <= 24) or not (place.isdigit() and 1 <= len(place) <= 24):
-        raise ValueError("Roblox-IDs müssen numerisch sein.")
+        raise ValueError("Roblox Universe-ID und Place-ID müssen numerisch sein.")
     return key, universe, place
 
 def split_roblox_code(source):
@@ -281,7 +290,7 @@ def publish_generated():
         payload = place_xml(data["roblox_code"], str(data.get("game_name", "Game KI"))[:90])
         if len(payload) > 4 * 1024 * 1024:
             return err("Place-Datei größer als 4 MiB.", 413)
-        return publish_bytes(payload)
+        return publish_bytes(payload, config=data.get("roblox_config"))
     except RuntimeError as exc:
         return err(str(exc), 503)
     except ValueError as exc:
