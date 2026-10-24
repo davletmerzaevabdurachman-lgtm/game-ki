@@ -598,7 +598,7 @@ def publish_bytes(payload, content_type="application/xml", config=None):
         result = response.json()
     except ValueError:
         result = {}
-    return jsonify({"ok": True, "versionNumber": result.get("versionNumber"), "placeId": place})
+    return jsonify({"ok": True, "versionNumber": result.get("versionNumber"), "universeId": universe, "placeId": place})
 
 @app.get("/")
 def home():
@@ -622,34 +622,47 @@ def status():
     })
 
 
+def public_universe_for_place(place):
+    """Resolve the canonical Universe ID for an existing Roblox Place ID."""
+    place = str(place).strip()
+    if not (place.isdigit() and 1 <= len(place) <= 24):
+        raise ValueError("Place ID muss eine gültige Zahl sein.")
+    try:
+        response = requests.get(
+            "https://apis.roblox.com/universes/v1/places/" + place + "/universe",
+            timeout=(5, 12),
+        )
+    except requests.Timeout as exc:
+        raise RuntimeError("Roblox antwortet beim Prüfen der Place ID nicht rechtzeitig.") from exc
+    except requests.RequestException as exc:
+        raise RuntimeError("Roblox ist gerade nicht erreichbar, um Place ID und Universe ID abzugleichen.") from exc
+    if response.status_code == 404:
+        raise ValueError("Roblox findet die Place ID " + place + " nicht. Kopiere die Place ID aus dem Creator Dashboard.")
+    if not response.ok:
+        raise RuntimeError("Roblox konnte die Universe ID für Place " + place + " nicht prüfen (HTTP " + str(response.status_code) + ").")
+    try:
+        payload = response.json()
+    except ValueError as exc:
+        raise RuntimeError("Roblox hat beim Prüfen der Place ID eine ungültige Antwort zurückgegeben.") from exc
+    universe = str(payload.get("universeId", "")).strip()
+    if not (universe.isdigit() and 1 <= len(universe) <= 24):
+        raise RuntimeError("Roblox hat keine gültige Universe ID für Place " + place + " zurückgegeben.")
+    return universe
+
+
 @app.get("/resolve-place")
 def resolve_place():
     """Resolve a Roblox Place ID to its owning Universe ID using Roblox's public endpoint."""
     if not authorized():
         return auth_error()
     place = str(request.args.get("place_id", "")).strip()
-    if not (place.isdigit() and 1 <= len(place) <= 24):
-        return err("Place ID muss eine gültige Zahl sein.", 400)
     try:
-        response = requests.get(
-            "https://apis.roblox.com/universes/v1/places/" + place + "/universe",
-            timeout=(5, 12),
-        )
-        if response.status_code == 404:
-            return err("Roblox findet zu dieser Place ID keine Experience. Prüfe die ID.", 404)
-        if not response.ok:
-            return err("Roblox konnte die Universe ID gerade nicht ermitteln (HTTP " + str(response.status_code) + ").", 502)
-        payload = response.json()
-        universe = str(payload.get("universeId", "")).strip()
-        if not (universe.isdigit() and 1 <= len(universe) <= 24):
-            return err("Roblox hat keine gültige Universe ID für diese Place ID zurückgegeben.", 502)
+        universe = public_universe_for_place(place)
         return jsonify({"place_id": place, "universe_id": universe})
-    except requests.Timeout:
-        return err("Zeitüberschreitung beim Ermitteln der Universe ID. Versuche es erneut.", 504)
-    except requests.RequestException:
-        return err("Roblox ist gerade nicht erreichbar, um die Universe ID zu ermitteln.", 502)
-    except (ValueError, TypeError):
-        return err("Roblox hat ungültige Daten für diese Place ID zurückgegeben.", 502)
+    except ValueError as exc:
+        return err(str(exc), 404 if "findet die Place ID" in str(exc) else 400)
+    except RuntimeError as exc:
+        return err(str(exc), 502)
 
 
 @app.get("/roblox-preview")
@@ -772,7 +785,21 @@ def publish_generated():
         payload = place_xml(data["roblox_code"], str(data.get("game_name", "Game KI"))[:90], data.get("roblox_scene"))
         if len(payload) > 4 * 1024 * 1024:
             return err("Place-Datei größer als 4 MiB.", 413)
-        return publish_bytes(payload, config=data.get("roblox_config"))
+        supplied = data.get("roblox_config") if isinstance(data.get("roblox_config"), dict) else {}
+        api_key, configured_universe, place = roblox_env(supplied)
+        # Roblox itself is the source of truth: never send a Place ID with a mismatched Universe ID.
+        actual_universe = public_universe_for_place(place)
+        effective_config = {
+            "api_key": api_key,
+            "universe_id": actual_universe,
+            "place_id": place,
+        }
+        if configured_universe != actual_universe:
+            app.logger.warning(
+                "Roblox publish corrected Universe ID for Place %s (configured=%s, resolved=%s)",
+                place, configured_universe, actual_universe
+            )
+        return publish_bytes(payload, config=effective_config)
     except RuntimeError as exc:
         return err(str(exc), 503)
     except ValueError as exc:
