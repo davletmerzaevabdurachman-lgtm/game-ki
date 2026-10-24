@@ -216,7 +216,7 @@ def normalize_scene(raw_scene, prompt):
         parts.append({"name":name,"size":size,"position":pos,"color":color,"material":material,
                       "anchored":True,"can_collide":bool(raw.get("can_collide",True)),
                       "transparency":max(0,min(1,transparency)),"yaw":max(-180,min(180,yaw))})
-    if len(parts)<8: return default_scene(prompt)
+    if len(parts)<20: return default_scene(prompt)
     if not any(("ground" in p["name"].lower() or "floor" in p["name"].lower() or "terrain" in p["name"].lower()) and p["size"][0]>=60 and p["size"][2]>=60 for p in parts):
         parts.insert(0,_scene_part("GameKI_Ground",[180,4,180],[0,-3,0],[.22,.24,.27],"Concrete"))
     spawn=nums(raw_scene.get("spawn"),[0,4,30],-500,500)
@@ -364,8 +364,8 @@ def place_xml(source, title, scene=None):
     ET.SubElement(client_props,"bool",{"name":"Disabled"}).text="false"
     output=ET.tostring(root,encoding="utf-8",xml_declaration=True)
     parsed=ET.fromstring(output)
-    if len(parsed.findall(".//Item[@class='Part']"))<8:
-        raise ValueError("Die Place-Datei hat zu wenig 3D-Level-Geometrie.")
+    if len(parsed.findall(".//Item[@class='Part']"))<20:
+        raise ValueError("Die Place-Datei hat zu wenig 3D-Level-Geometrie. Mindestens 20 bearbeitbare Parts sind erforderlich.")
     if len(parsed.findall(".//ProtectedString[@name='Source']"))<2:
         raise ValueError("Die Place-Datei enthält nicht beide Roblox-Scripts.")
     return output
