@@ -148,7 +148,7 @@ def _strip_generated_fence(raw, kind):
             lines = lines[1:]
         if lines and lines[-1].strip().startswith(chr(96) * 3):
             lines = lines[:-1]
-        text = "\\n".join(lines).strip()
+        text = "\n".join(lines).strip()
     if kind == "html" and not text.lower().startswith("<!doctype html") and "<html" in text.lower():
         text = text[text.lower().find("<html"):]
     return text
@@ -708,10 +708,10 @@ def generate():
             scene_context = previous.get("roblox_scene")
             scene_text = json.dumps(scene_context, ensure_ascii=False)[:16000] if isinstance(scene_context, (dict, list)) else ""
             prompt = ("Erweitere das bestehende Projekt, starte nicht neu. Ursprünglicher Auftrag: " + original[:4000]
-                      + "\\nBisheriger Luau-Code:\\n" + code[:35000]
-                      + "\\nBisherige HTML-Demo:\\n" + web_demo[:35000]
-                      + "\\nBisherige editierbare Roblox-Szene:\\n" + scene_text
-                      + "\\nNeue Änderung:\\n" + prompt)
+                      + "\nBisheriger Luau-Code:\n" + code[:35000]
+                      + "\nBisherige HTML-Demo:\n" + web_demo[:35000]
+                      + "\nBisherige editierbare Roblox-Szene:\n" + scene_text
+                      + "\nNeue Änderung:\n" + prompt)
 
     try:
         result = generate_components(prompt.strip(), provider)
@@ -722,10 +722,10 @@ def generate():
             repair_prompt = (
                 "Repair the following existing game without changing its idea. Return raw artifacts, NOT JSON. "
                 "Fix the validation issue: " + str(initial_error)
-                + "\\nRequested game:\\n" + prompt.strip()[:3500]
-                + "\\nCurrent Roblox scripts:\\n" + result["roblox_code"][:24000]
-                + "\\nCurrent browser demo:\\n" + result["web_simulation"][:24000]
-                + "\\nReturn complete updated Roblox Luau scripts with both exact markers and a complete standalone playable HTML5 game."
+                + "\nRequested game:\n" + prompt.strip()[:3500]
+                + "\nCurrent Roblox scripts:\n" + result["roblox_code"][:24000]
+                + "\nCurrent browser demo:\n" + result["web_simulation"][:24000]
+                + "\nReturn complete updated Roblox Luau scripts with both exact markers and a complete standalone playable HTML5 game."
             )
             repaired = generate_components(repair_prompt, provider)
             validate_roblox_scripts(repaired["roblox_code"])
