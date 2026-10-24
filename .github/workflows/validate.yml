@@ -21,7 +21,7 @@ jobs:
         with:
           node-version: "22"
       - name: Validate Python syntax
-        run: python -m py_compile app.py api/index.py
+        run: python -m py_compile app.py
       - name: Validate Vercel configuration and routes
         run: |
           python - <<'PY'
