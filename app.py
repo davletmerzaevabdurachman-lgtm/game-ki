@@ -581,10 +581,17 @@ def publish_bytes(payload, content_type="application/xml", config=None):
             detail=response.text[:400]
         app.logger.warning("Roblox publish rejected HTTP %s",response.status_code)
         if response.status_code in (401,403):
-            message=("Roblox hat den API-Key nicht zum Aktualisieren dieser Experience autorisiert. "
-                     "Prüfe universe-places:write, die ausgewählte Experience, den richtigen Account/Gruppe "
-                     "und die Universe-/Place-ID. Erstelle bei Bedarf einen neuen Key.")
-            return jsonify({"error":message,"details":str(detail)[:600]}),response.status_code
+            message=("Roblox lehnt den Schlüssel für die angeforderte Experience ab. "
+                     "Die API-Berechtigung universe-places mit Write muss genau für die Experience freigegeben sein, "
+                     "zu der die gesendete Universe ID gehört. Prüfe außerdem, ob die Place ID zu dieser Universe ID gehört "
+                     "und ob Game KI den aktuellen Schlüssel verwendet.")
+            # Echo only non-secret identifiers so a scope failure can be diagnosed without exposing credentials.
+            return jsonify({
+                "error":message,
+                "details":str(detail)[:600],
+                "universeId":universe,
+                "placeId":place
+            }),response.status_code
         return jsonify({"error":"Roblox hat die Veröffentlichung abgelehnt (HTTP "+str(response.status_code)+").",
                         "details":str(detail)[:600]}),502
     try:
