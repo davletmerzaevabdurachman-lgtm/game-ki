@@ -51,7 +51,7 @@ jobs:
           assert Path("templates/fallback-game.html").exists()
           source = Path("app.py").read_text()
           for route in ('@app.get("/")', '@app.get("/status")', '@app.post("/generate")',
-                        '@app.get("/roblox-preview")', '@app.post("/publish-generated")', '@app.post("/upload")',
+                        '@app.get("/roblox-preview")', '@app.get("/resolve-place")', '@app.post("/publish-generated")', '@app.post("/upload")',
                         '@app.get("/starter-game")'):
               assert route in source, "Missing route: " + route
           print("Vercel config and Flask routes look good")
