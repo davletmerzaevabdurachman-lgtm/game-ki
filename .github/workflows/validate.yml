@@ -22,6 +22,22 @@ jobs:
           node-version: "22"
       - name: Validate Python syntax
         run: python -m py_compile app.py
+      - name: Install minimal smoke-test dependencies
+        run: python -m pip install Flask==3.1.1 requests==2.32.4
+      - name: Smoke-test editable Roblox place generation
+        run: |
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+          from app import default_scene, place_xml
+          server = "--[[GAME_KI_SERVER_SCRIPT]]\nlocal Players = game:GetService('Players')\n" + ("-- server gameplay logic\n" * 18)
+          client = "--[[GAME_KI_CLIENT_SCRIPT]]\nlocal Players = game:GetService('Players')\n" + ("-- client HUD and controls\n" * 18)
+          payload = place_xml(server + client, "CI Zombie Survival", default_scene("zombie survival"))
+          root = ET.fromstring(payload)
+          assert len(root.findall(".//Item[@class='Part']")) >= 20, "Expected visible scene geometry"
+          assert len(root.findall(".//ProtectedString[@name='Source']")) == 2, "Expected server and client scripts"
+          assert root.find("./Item[@class='Workspace']") is not None
+          print("Editable Roblox scene XML contains level geometry and both scripts")
+          PY
       - name: Validate Vercel configuration and routes
         run: |
           python - <<'PY'
@@ -35,7 +51,7 @@ jobs:
           assert Path("templates/fallback-game.html").exists()
           source = Path("app.py").read_text()
           for route in ('@app.get("/")', '@app.get("/status")', '@app.post("/generate")',
-                        '@app.post("/publish-generated")', '@app.post("/upload")',
+                        '@app.get("/roblox-preview")', '@app.post("/publish-generated")', '@app.post("/upload")',
                         '@app.get("/starter-game")'):
               assert route in source, "Missing route: " + route
           print("Vercel config and Flask routes look good")
