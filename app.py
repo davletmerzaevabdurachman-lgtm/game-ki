@@ -228,6 +228,40 @@ def normalize_scene(raw_scene, prompt):
             "spawn":spawn,"parts":parts[:70]}
 
 
+def validate_secret_console(prompt, data):
+    """Fail a requested 6787 easter egg closed instead of silently returning a fake menu."""
+    low_prompt = (prompt or "").lower()
+    if "6787" not in low_prompt or not any(word in low_prompt for word in ("zombie", "hacker", "secret console", "hacker console", "outbreak")):
+        return
+    code = str(data.get("roblox_code", "")).lower()
+    web = str(data.get("web_simulation", "")).lower()
+    def has(text, *terms):
+        return any(term in text for term in terms)
+    issues = []
+    for label, variants in (
+        ("restore/heal", ("heal", "restore")),
+        ("overdrive", ("overdrive",)),
+        ("purge wave", ("purge",)),
+        ("credits", ("credits", "credit")),
+        ("ammo", ("ammo", "munition")),
+        ("night vision", ("night vision", "night_vision", "nightvision")),
+    ):
+        if not has(code, *variants):
+            issues.append("Roblox: " + label)
+        if not has(web, *variants):
+            issues.append("Browser-Demo: " + label)
+    if "6787" not in code:
+        issues.append("Roblox: Zugangscode 6787")
+    if "6787" not in web:
+        issues.append("Browser-Demo: Zugangscode 6787")
+    if not has(code, "onserverevent") or not has(code, "remoteevent"):
+        issues.append("Roblox: serverseitige RemoteEvent-Validierung")
+    if not has(web, "hacker console", "secret console") or not has(web, "input") or not has(web, "unlock"):
+        issues.append("Browser-Demo: bedienbare Geheimcode-Konsole")
+    if issues:
+        raise ValueError("Die angeforderte 6787-Konsole ist unvollständig: " + ", ".join(issues[:12]))
+
+
 def ensure_playable(prompt, provider, data):
     data["roblox_scene"]=normalize_scene(data.get("roblox_scene"),prompt)
     try:
@@ -499,16 +533,21 @@ def generate():
         result=ensure_playable(prompt.strip(),provider,result)
         try:
             validate_roblox_scripts(result["roblox_code"])
+            validate_secret_console(prompt.strip(), result)
         except ValueError as initial_error:
-            repair_prompt=("Repair the Roblox scripts in this project. Return a single valid JSON object with roblox_code, web_simulation, roblox_scene. "
-                "roblox_code MUST contain complete server and client scripts delimited by --[[GAME_KI_SERVER_SCRIPT]] and --[[GAME_KI_CLIENT_SCRIPT]], "
-                "with complete gameplay logic, no placeholders. Preserve the current gameplay and scene. Request:\n"+prompt.strip()[:4500]+
-                "\nValidation issue:\n"+str(initial_error)+"\nCurrent scripts:\n"+result["roblox_code"][:55000]+
+            repair_prompt=("Repair this game build before returning it. Return one valid JSON object with roblox_code, web_simulation, roblox_scene. "
+                "Keep a complete playable HTML game and complete separate Roblox server/client scripts, no placeholders. "
+                "Preserve the existing level and gameplay. If the prompt requests the 6787 Zombie/Hacker Console, it MUST be a working in-game easter egg: "
+                "the browser build has a code input and a working hacker-console panel with restore/heal, overdrive, purge wave, credits, ammo and night vision; "
+                "the Roblox build has the same UI and server-validated, rate-limited actions through a RemoteEvent. Do not make exploits for other Roblox games. "
+                "Request:\n"+prompt.strip()[:4500]+"\nValidation issue:\n"+str(initial_error)+
+                "\nCurrent code:\n"+result["roblox_code"][:55000]+"\nCurrent demo:\n"+result["web_simulation"][:50000]+
                 "\nScene JSON:\n"+json.dumps(result["roblox_scene"],ensure_ascii=False)[:12000])
             repaired=parse_ai(ai(repair_prompt,provider))
             repaired["web_simulation"]=normalize_html(repaired["web_simulation"])
             repaired["roblox_scene"]=normalize_scene(repaired.get("roblox_scene") or result.get("roblox_scene"),prompt.strip())
             validate_roblox_scripts(repaired["roblox_code"])
+            validate_secret_console(prompt.strip(), repaired)
             result=repaired
         return jsonify({"roblox_code":result["roblox_code"],
                         "web_simulation":result["web_simulation"],
