@@ -1,4 +1,4 @@
-import os, json, re, hmac, uuid, html as html_lib
+import os, json, re, hmac, uuid, math, html as html_lib
 import xml.etree.ElementTree as ET
 from pathlib import Path
 import requests
@@ -8,17 +8,21 @@ from werkzeug.exceptions import RequestEntityTooLarge
 ROOT = Path(__file__).resolve().parent
 app = Flask(__name__, template_folder=str(ROOT / "templates"))
 app.config["MAX_CONTENT_LENGTH"] = 4 * 1024 * 1024
-SYSTEM = """You are Game KI Studio, a senior Roblox Luau engineer and browser-game developer.
-Return exactly one JSON object with two string fields: roblox_code and web_simulation. No Markdown fences.
-Both outputs must implement the user's requested game and be complete, not pseudocode or TODOs.
-ROBLOX OUTPUT: roblox_code must contain TWO complete scripts in this exact format:
+SYSTEM = """You are Game KI Studio, a senior Roblox Luau engineer, level designer, and browser-game developer.
+Return one valid JSON object only, without Markdown fences, with these fields:
+- roblox_code: string
+- web_simulation: string
+- roblox_scene: object with keys name, theme, spawn ([x,y,z]), and parts (array of up to 70 part objects).
+Each part has name, size ([x,y,z]), position ([x,y,z]), color ([r,g,b] 0..1), material (Plastic, SmoothPlastic, Neon, Wood, WoodPlanks, Concrete, Slate, Brick, Metal, Grass), can_collide (boolean), transparency (0..1), yaw (degrees). Create 20-60 meaningful editable 3D level parts: floor, paths, platforms, boundaries, landmarks, cover/obstacles and spawn. Fit the requested genre. No single-cube placeholder map.
+ROBLOX OUTPUT: roblox_code contains TWO complete scripts with exactly these markers:
 --[[GAME_KI_SERVER_SCRIPT]]
-<complete Script source for ServerScriptService>
+<complete server Script source>
 --[[GAME_KI_CLIENT_SCRIPT]]
-<complete LocalScript source for StarterPlayer > StarterPlayerScripts>
-The server script creates the world, spawn, objectives and server-owned game state. The client script creates player HUD/controls and sends requests through RemoteEvents created by the server. Server validates every RemoteEvent action and never trusts client state. Use no external assets, require(assetId), exploit executors, unauthorized injection, credential theft or remote code loading. Original content only.
-WEB OUTPUT: web_simulation is a complete standalone HTML5 document beginning with <!doctype html>, containing html, head, body, and an inline script. It must be playable immediately in a sandboxed iframe: render the actual game, update state, react to keyboard and pointer/touch input, show a visible objective, clear feedback and a restart control. Implement the same core loop as the Roblox version. Inline CSS and JS only; no external assets/libraries, network/fetch, WebSocket, cookies, localStorage, dynamic imports or external fonts. Responsive design and on-screen mobile controls. Keep the game concise enough to fit; do not omit core gameplay. Check the logic for syntax errors before returning.
-For edits, preserve and extend the given project instead of starting over. Return only the JSON object."""
+<complete LocalScript source>
+The roblox_scene geometry will be saved directly into the place file and already exists under workspace at runtime. Do not clear, replace or duplicate static scene geometry in scripts. Server script creates only dynamic gameplay and server-owned state: objectives, enemies/targets, damage, rewards, progression, RemoteEvents, spawn validation, win/lose/round logic. Client script builds a polished Roblox HUD/controls, uses existing scene geometry and communicates through server-created RemoteEvents. Validate RemoteEvent inputs on server; never trust client state. Use Roblox APIs correctly, clean up instances, and avoid unbounded loops. No placeholders/TODOs, external require(assetId), exploit executors, unauthorized injection, credential theft, remote code loading or fake publish claims. Original content only.
+Build an actually playable core loop, not a static showcase. Include clear objectives, progression, feedback, restart/round loop and HUD. Avoid requiring external assets.
+WEB OUTPUT: web_simulation is a complete standalone HTML5 document starting with <!doctype html>, with html/head/body and inline JS. It must be actually playable in a sandboxed iframe, implementing the same core loop and theme: movement/input, collisions/obstacles, enemies or objectives, health/progress feedback, win/lose state and restart. Keyboard and pointer/touch input, responsive design and on-screen mobile controls. Inline CSS/JS only; no external assets/libraries, network/fetch, WebSocket, cookies, localStorage, dynamic imports or external fonts. Do not return a decorative mockup in place of gameplay.
+For edits preserve and extend existing scripts, HTML and scene context provided. Return only valid JSON."""
 
 def err(message, status):
     return jsonify({"error": message}), status
@@ -60,8 +64,8 @@ def parse_ai(raw):
     text = (raw or "").strip()
     ticks = chr(96) * 3
     if text.startswith(ticks):
-        text = re.sub("^" + ticks + "(?:json)?\\s*", "", text, count=1, flags=re.I)
-        text = re.sub("\\s*" + ticks + "$", "", text, count=1)
+        text = re.sub("^" + ticks + "(?:json)?\s*", "", text, count=1, flags=re.I)
+        text = re.sub("\s*" + ticks + "$", "", text, count=1)
     try:
         data = json.loads(text)
     except ValueError:
@@ -73,7 +77,18 @@ def parse_ai(raw):
         raise ValueError("KI-Antwort benötigt roblox_code und web_simulation.")
     if len(data["roblox_code"]) > 220000 or len(data["web_simulation"]) > 350000:
         raise ValueError("KI-Antwort zu groß.")
-    return {"roblox_code": data["roblox_code"].strip(), "web_simulation": data["web_simulation"].strip()}
+    scene = data.get("roblox_scene")
+    if isinstance(scene, str):
+        try:
+            scene = json.loads(scene)
+        except ValueError:
+            scene = None
+    if not isinstance(scene, dict):
+        scene = None
+    return {"roblox_code": data["roblox_code"].strip(),
+            "web_simulation": data["web_simulation"].strip(),
+            "roblox_scene": scene}
+
 
 def normalize_html(source):
     text = (source or "").strip()
@@ -99,27 +114,140 @@ def game_fallback(prompt):
     title = html_lib.escape(" ".join((prompt or "Survival Arena").split())[:72])
     return page.replace("Game KI · Survival Arena", title or "Game KI · Survival Arena")
 
+def _scene_part(name, size, position, color, material="Concrete", collide=True, yaw=0):
+    return {"name": name, "size": size, "position": position, "color": color,
+            "anchored": True, "can_collide": collide, "material": material,
+            "transparency": 0, "yaw": yaw}
+
+
+def default_scene(prompt):
+    """Build a visible editable level if the model did not return a usable scene plan."""
+    lower=(prompt or "").lower()
+    parts=[]
+    def add(name,size,pos,color,mat="Concrete",collide=True,yaw=0):
+        parts.append(_scene_part(name,size,pos,color,mat,collide,yaw))
+    if any(w in lower for w in ("obby","parkour","checkpoint","hindernis")):
+        theme,spawn="obby",[0,5,52]
+        add("IslandGround",[150,4,150],[0,-3,0],[.18,.20,.28],"Slate")
+        add("StartPlatform",[24,2,20],[0,2,52],[.18,.66,.95],"SmoothPlastic")
+        colors=[[.55,.35,.98],[.16,.82,.96],[.35,.88,.53],[1,.58,.18]]
+        for i in range(14):
+            add("ParkourPlatform_%02d"%i,[7+i%3,1.2,6],[(i%3-1)*8,3+(i%4)*1.8,43-i*7],colors[i%4],"Neon" if i%4==0 else "SmoothPlastic",True,(i*11)%30-15)
+        add("FinishIsland",[24,2,18],[0,8,-57],[.28,.86,.48],"SmoothPlastic")
+        for i in range(6): add("LavaHazard_%02d"%i,[8,.5,5],[(i%3-1)*12,-1,8-i*13],[1,.14,.08],"Neon",False)
+        for x in (-65,65): add("IslandEdge",[3,9,130],[x,2,0],[.16,.18,.26],"Slate")
+    elif any(w in lower for w in ("race","racing","car","drift","rennen")):
+        theme,spawn="racing",[0,3,91]
+        add("RaceGround",[220,4,220],[0,-3,0],[.16,.36,.20],"Grass")
+        add("RaceRoad",[24,.6,180],[0,-.8,0],[.11,.12,.15],"Concrete")
+        for z in range(-80,90,14): add("RoadDash",[.6,.12,7],[0,-.43,z],[1,.82,.35],"Neon",False)
+        for x in (-14,14): add("TrackBarrier",[2,4,185],[x,1,-1],[.9,.23,.18],"SmoothPlastic")
+        for i in range(12): add("RacePylon_%02d"%i,[4,4,4],[(-1 if i%2 else 1)*(27+i%3*8),1,-70+i*13],[1,.56,.16],"Neon")
+        for x in (-10,10): add("StartGatePost",[2,12,2],[x,5,78],[.22,.68,1],"Neon")
+        add("StartGateTop",[22,2,2],[0,12,78],[.22,.68,1],"Neon")
+    elif any(w in lower for w in ("tycoon","simulator","farm","shop","cash","factory")):
+        theme,spawn="tycoon",[0,3,54]
+        add("TycoonIsland",[150,4,150],[0,-3,0],[.16,.25,.21],"Grass")
+        add("MainPlot",[50,1,50],[0,0,0],[.42,.45,.50],"Concrete")
+        for x in (-26,26): add("PlotBorder",[2,5,54],[x,2,0],[.18,.21,.25],"Metal")
+        for z in (-26,26): add("PlotBorder",[54,5,2],[0,2,z],[.18,.21,.25],"Metal")
+        for i,pos in enumerate([[-14,2,-12],[0,2,-12],[14,2,-12],[-14,2,7],[0,2,7],[14,2,7]]):
+            add("Machine_%02d"%i,[7,4+i%3*2,7],pos,[[.34,.7,.96],[.61,.42,.96],[.28,.82,.54]][i%3],"Metal")
+        add("SpawnPlatform",[18,1,15],[0,1,54],[.2,.72,.48],"SmoothPlastic")
+        for i in range(8): add("Tree_%02d"%i,[3,10,3],[(-1 if i%2 else 1)*(45+i%3*5),4,-35+i*10],[.22,.42,.23],"Wood")
+    else:
+        theme="zombie-survival" if any(w in lower for w in ("zombie","survival","horror","undead")) else "arena"
+        spawn=[0,4,76] if theme=="zombie-survival" else [0,4,65]
+        add("WorldGround",[220,4,220],[0,-3,0],[.19,.21,.23],"Concrete")
+        add("MainRoad",[18,.4,190],[0,-.7,0],[.08,.09,.11],"Concrete")
+        for x in (-11,11): add("Sidewalk",[5,.8,188],[x,-.32,0],[.33,.34,.32],"Concrete")
+        buildings=[(-42,10,-55,24,22,28),(42,14,-53,28,30,32),(-48,9,-5,22,20,26),(48,12,-4,25,26,30),(-42,15,47,28,32,28),(43,11,48,25,24,33),(-72,8,3,16,18,22),(72,8,8,16,18,22)]
+        for i,(x,y,z,sx,sy,sz) in enumerate(buildings):
+            add("RuinedBuilding_%02d"%i,[sx,sy,sz],[x,y,z],[[.22,.25,.28],[.28,.27,.25],[.20,.24,.25]][i%3],"Concrete")
+            add("BrokenRoof_%02d"%i,[sx+2,1.2,sz+2],[x,y+sy/2+.7,z],[.13,.15,.17],"Slate")
+            for wx in (-1,1): add("DarkWindow_%02d"%i,[.25,3,4],[x+wx*(sx/2+.12),y+1,z],[.08,.17,.21],"SmoothPlastic",False)
+        for i in range(12):
+            x=(-1 if i%2 else 1)*(5+(i%3)*4); z=-65+i*11
+            add("RoadBarricade_%02d"%i,[5,2.8,2],[x,.3,z],[.62,.18,.13] if i%3==0 else [.27,.29,.31],"Metal",True,(i%5)*8-16)
+        for i in range(8): add("SupplyCrate_%02d"%i,[3.5,3,3.5],[(-1 if i%2 else 1)*(20+i%3*4),.5,-48+i*13],[.31,.34,.27],"Wood")
+        add("SafeZoneFloor",[26,.8,20],[0,0,78],[.15,.34,.25],"SmoothPlastic")
+        for x in (-13,13): add("SafeZoneWall",[1,7,20],[x,3,78],[.22,.52,.34],"Metal")
+        add("SafeZoneRear",[26,7,1],[0,3,88],[.22,.48,.32],"Metal")
+        add("WatchTower",[6,13,6],[-25,6,75],[.25,.28,.30],"Metal")
+        add("TowerDeck",[13,1,13],[-25,13,75],[.32,.35,.35],"WoodPlanks")
+        for x in (-90,90): add("PerimeterWall",[3,9,170],[x,2,0],[.15,.18,.21],"Concrete")
+    add("SpawnMarker",[7,.4,7],[spawn[0],.1,spawn[2]],[.22,.84,.48],"Neon",False)
+    return {"name":"Generated "+theme,"theme":theme,"spawn":spawn,"parts":parts[:70]}
+
+
+def normalize_scene(raw_scene, prompt):
+    if isinstance(raw_scene,str):
+        try: raw_scene=json.loads(raw_scene)
+        except ValueError: raw_scene=None
+    if not isinstance(raw_scene,dict) or not isinstance(raw_scene.get("parts"),list):
+        return default_scene(prompt)
+    allowed={"Plastic","SmoothPlastic","Neon","Wood","WoodPlanks","Concrete","Slate","Brick","Metal","Grass"}
+    def nums(values,default,low,high):
+        if not isinstance(values,(list,tuple)) or len(values)<3: values=default
+        out=[]
+        for i in range(3):
+            try: n=float(values[i])
+            except (TypeError,ValueError): n=float(default[i])
+            if not math.isfinite(n): n=float(default[i])
+            out.append(max(low,min(high,n)))
+        return out
+    parts=[]
+    for raw in raw_scene["parts"][:70]:
+        if not isinstance(raw,dict): continue
+        size=nums(raw.get("size"),[4,2,4],.5,500)
+        pos=nums(raw.get("position"),[0,1,0],-500,500)
+        color=nums(raw.get("color"),[.35,.38,.42],0,255)
+        if max(color)>1: color=[v/255 for v in color]
+        color=[max(0,min(1,v)) for v in color]
+        material=str(raw.get("material","Concrete"))
+        if material not in allowed: material="Concrete"
+        try: transparency=float(raw.get("transparency",0))
+        except (TypeError,ValueError): transparency=0
+        try: yaw=float(raw.get("yaw",0))
+        except (TypeError,ValueError): yaw=0
+        if not math.isfinite(transparency): transparency=0
+        if not math.isfinite(yaw): yaw=0
+        name=re.sub(r"[\x00-\x1f]","",str(raw.get("name","LevelPart")))[:80].strip() or "LevelPart"
+        parts.append({"name":name,"size":size,"position":pos,"color":color,"material":material,
+                      "anchored":True,"can_collide":bool(raw.get("can_collide",True)),
+                      "transparency":max(0,min(1,transparency)),"yaw":max(-180,min(180,yaw)})
+    if len(parts)<8: return default_scene(prompt)
+    if not any(("ground" in p["name"].lower() or "floor" in p["name"].lower() or "terrain" in p["name"].lower()) and p["size"][0]>=60 and p["size"][2]>=60 for p in parts):
+        parts.insert(0,_scene_part("GameKI_Ground",[180,4,180],[0,-3,0],[.22,.24,.27],"Concrete"))
+    spawn=nums(raw_scene.get("spawn"),[0,4,30],-500,500)
+    spawn[1]=max(1,min(200,spawn[1]))
+    return {"name":re.sub(r"[\x00-\x1f]","",str(raw_scene.get("name","Game KI World")))[:80],
+            "theme":re.sub(r"[\x00-\x1f]","",str(raw_scene.get("theme","custom")))[:50],
+            "spawn":spawn,"parts":parts[:70]}
+
+
 def ensure_playable(prompt, provider, data):
+    data["roblox_scene"]=normalize_scene(data.get("roblox_scene"),prompt)
     try:
-        data["web_simulation"] = normalize_html(data["web_simulation"])
+        data["web_simulation"]=normalize_html(data["web_simulation"])
         return data
     except ValueError:
-        repair_prompt = (
-            "Your last web_simulation was missing or invalid. Repair it into a complete standalone playable HTML game. "
-            "Return the same two-field JSON schema. Keep roblox_code unchanged. The HTML must start with doctype html, "
-            "contain head/body and a complete inline script, and work in a sandboxed iframe without external network, assets, "
-            "libraries, cookies or storage. Original request:\n" + prompt[:4500] +
-            "\nExisting Luau (preserve):\n" + data["roblox_code"][:40000] +
-            "\nBroken HTML to repair:\n" + data["web_simulation"][:40000]
-        )
+        repair_prompt=("Repair this project as one valid JSON object with roblox_code, web_simulation, and roblox_scene. "
+            "Keep complete server/client scripts and the original game idea; return a complete playable standalone HTML5 game and 20-60 editable scene parts. "
+            "No Markdown, network or external assets. Request:\n"+prompt[:4500]+
+            "\nExisting Roblox scripts:\n"+data["roblox_code"][:40000]+
+            "\nExisting scene JSON:\n"+json.dumps(data["roblox_scene"],ensure_ascii=False)[:16000]+
+            "\nBroken HTML:\n"+data["web_simulation"][:40000])
         try:
-            repaired = parse_ai(ai(repair_prompt, provider))
-            repaired["web_simulation"] = normalize_html(repaired["web_simulation"])
+            repaired=parse_ai(ai(repair_prompt,provider))
+            repaired["web_simulation"]=normalize_html(repaired["web_simulation"])
+            repaired["roblox_scene"]=normalize_scene(repaired.get("roblox_scene") or data.get("roblox_scene"),prompt)
             return repaired
         except Exception as exc:
-            app.logger.warning("Preview repair failed (%s); using playable fallback", type(exc).__name__)
-            data["web_simulation"] = game_fallback(prompt)
+            app.logger.warning("Preview repair failed (%s); using playable fallback",type(exc).__name__)
+            data["web_simulation"]=game_fallback(prompt)
             return data
+
 
 def roblox_env(config=None):
     """Resolve Roblox Open Cloud settings from the publish request or server env.
@@ -158,36 +286,90 @@ def split_roblox_code(source):
         raise ValueError("Roblox-Script-Abschnitt ist zu groß.")
     return server_code, client_code
 
-def place_xml(source, title):
-    server_code, client_code = split_roblox_code(source)
-    root = ET.Element("roblox", {
-        "xmlns:xmime": "http://www.w3.org/2005/05/xmlmime",
-        "xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance",
-        "xsi:noNamespaceSchemaLocation": "http://www.roblox.com/roblox.xsd",
-        "version": "4"
-    })
-    def add(parent, cls, name):
-        obj = ET.SubElement(parent, "Item", {"class": cls, "referent": "RBX" + uuid.uuid4().hex.upper()})
-        props = ET.SubElement(obj, "Properties")
-        ET.SubElement(props, "string", {"name": "Name"}).text = name
-        return obj, props
-    add(root, "Workspace", "Workspace")
-    add(root, "ReplicatedStorage", "ReplicatedStorage")
-    service, _ = add(root, "ServerScriptService", "ServerScriptService")
-    _, props = add(service, "Script", "GameKI_Server")
-    ET.SubElement(props, "ProtectedString", {"name": "Source"}).text = server_code
-    ET.SubElement(props, "bool", {"name": "Disabled"}).text = "false"
-    if client_code:
-        starter_player, _ = add(root, "StarterPlayer", "StarterPlayer")
-        player_scripts, _ = add(starter_player, "StarterPlayerScripts", "StarterPlayerScripts")
-        _, client_props = add(player_scripts, "LocalScript", "GameKI_Client")
-        ET.SubElement(client_props, "ProtectedString", {"name": "Source"}).text = client_code
-        ET.SubElement(client_props, "bool", {"name": "Disabled"}).text = "false"
-    output = ET.tostring(root, encoding="utf-8", xml_declaration=True)
-    parsed = ET.fromstring(output)
-    if parsed.tag != "roblox" or not parsed.findall(".//ProtectedString[@name='Source']"):
-        raise ValueError("Place-XML konnte nicht erstellt werden.")
+def validate_roblox_scripts(source):
+    if "--[[GAME_KI_SERVER_SCRIPT]]" not in source or "--[[GAME_KI_CLIENT_SCRIPT]]" not in source:
+        raise ValueError("Die KI lieferte keine getrennten Roblox-Server- und Client-Scripts. Bitte erneut generieren.")
+    server_code, client_code=split_roblox_code(source)
+    if len(server_code)<140 or len(client_code)<140:
+        raise ValueError("Die Roblox-Scripts sind unvollständig. Bitte erneut generieren.")
+    lowered=(server_code+"\n"+client_code).lower()
+    if any(x in lowered for x in ("todo: implement","your code here","not implemented","add code here")):
+        raise ValueError("Die KI lieferte Platzhalter statt vollständiger Roblox-Scripts. Bitte erneut generieren.")
+    return {"server":server_code,"client":client_code}
+
+
+def place_xml(source, title, scene=None):
+    scripts=validate_roblox_scripts(source)
+    scene=normalize_scene(scene,title)
+    root=ET.Element("roblox",{
+        "xmlns:xmime":"http://www.w3.org/2005/05/xmlmime",
+        "xmlns:xsi":"http://www.w3.org/2001/XMLSchema-instance",
+        "xsi:noNamespaceSchemaLocation":"http://www.roblox.com/roblox.xsd",
+        "version":"4"})
+    def add(parent,cls,name):
+        obj=ET.SubElement(parent,"Item",{"class":cls,"referent":"RBX"+uuid.uuid4().hex.upper()})
+        props=ET.SubElement(obj,"Properties")
+        ET.SubElement(props,"string",{"name":"Name"}).text=name
+        return obj,props
+    def add_vector(parent,values,name):
+        node=ET.SubElement(parent,"Vector3",{"name":name})
+        for key,val in zip(("X","Y","Z"),values): ET.SubElement(node,key).text=str(round(float(val),4))
+    def add_color(parent,values,name="Color"):
+        node=ET.SubElement(parent,"Color3",{"name":name})
+        for key,val in zip(("R","G","B"),values): ET.SubElement(node,key).text=str(round(max(0,min(1,float(val))),4))
+    def add_cframe(parent,position,yaw):
+        node=ET.SubElement(parent,"CoordinateFrame",{"name":"CFrame"})
+        angle=math.radians(float(yaw)); c=math.cos(angle); s=math.sin(angle)
+        values={"X":position[0],"Y":position[1],"Z":position[2],"R00":c,"R01":0,"R02":s,
+                "R10":0,"R11":1,"R12":0,"R20":-s,"R21":0,"R22":c}
+        for key,val in values.items(): ET.SubElement(node,key).text=str(round(float(val),5))
+    materials={"Plastic":256,"SmoothPlastic":272,"Neon":288,"Wood":512,"WoodPlanks":528,
+               "Slate":800,"Concrete":816,"Brick":848,"Metal":1088,"Grass":1280}
+    def add_part(parent,part,cls="Part"):
+        obj=ET.SubElement(parent,"Item",{"class":cls,"referent":"RBX"+uuid.uuid4().hex.upper()})
+        props=ET.SubElement(obj,"Properties")
+        ET.SubElement(props,"bool",{"name":"Anchored"}).text="true"
+        ET.SubElement(props,"bool",{"name":"CanCollide"}).text="true" if part.get("can_collide",True) else "false"
+        add_cframe(props,part["position"],part.get("yaw",0))
+        add_color(props,part["color"])
+        ET.SubElement(props,"token",{"name":"Material"}).text=str(materials.get(part.get("material"),816))
+        ET.SubElement(props,"string",{"name":"Name"}).text=str(part["name"])[:80]
+        ET.SubElement(props,"float",{"name":"Reflectance"}).text="0"
+        ET.SubElement(props,"float",{"name":"Transparency"}).text=str(round(float(part.get("transparency",0)),3))
+        add_vector(props,part["size"],"size")
+        return obj
+
+    workspace,workspace_props=add(root,"Workspace","Workspace")
+    ET.SubElement(workspace_props,"float",{"name":"Gravity"}).text="196.2"
+    for part in scene["parts"][:70]: add_part(workspace,part)
+    sx,sy,sz=scene["spawn"]
+    spawn={"name":"GameKI_SpawnLocation","size":[7,1,7],"position":[sx,sy,sz],
+           "color":[.18,.78,.45],"material":"Neon","can_collide":True,"transparency":0,"yaw":0}
+    spawn_item=add_part(workspace,spawn,"SpawnLocation")
+    spawn_props=spawn_item.find("Properties")
+    ET.SubElement(spawn_props,"bool",{"name":"Neutral"}).text="true"
+    ET.SubElement(spawn_props,"float",{"name":"Duration"}).text="0"
+    add(root,"ReplicatedStorage","ReplicatedStorage")
+    lighting,lighting_props=add(root,"Lighting","Lighting")
+    ET.SubElement(lighting_props,"float",{"name":"Brightness"}).text="2"
+    add_color(lighting_props,[.28,.30,.34],"Ambient")
+    server_service,_=add(root,"ServerScriptService","ServerScriptService")
+    _,server_props=add(server_service,"Script","GameKI_Server")
+    ET.SubElement(server_props,"ProtectedString",{"name":"Source"}).text=scripts["server"]
+    ET.SubElement(server_props,"bool",{"name":"Disabled"}).text="false"
+    starter_player,_=add(root,"StarterPlayer","StarterPlayer")
+    player_scripts,_=add(starter_player,"StarterPlayerScripts","StarterPlayerScripts")
+    _,client_props=add(player_scripts,"LocalScript","GameKI_Client")
+    ET.SubElement(client_props,"ProtectedString",{"name":"Source"}).text=scripts["client"]
+    ET.SubElement(client_props,"bool",{"name":"Disabled"}).text="false"
+    output=ET.tostring(root,encoding="utf-8",xml_declaration=True)
+    parsed=ET.fromstring(output)
+    if len(parsed.findall(".//Item[@class='Part']"))<8:
+        raise ValueError("Die Place-Datei hat zu wenig 3D-Level-Geometrie.")
+    if len(parsed.findall(".//ProtectedString[@name='Source']"))<2:
+        raise ValueError("Die Place-Datei enthält nicht beide Roblox-Scripts.")
     return output
+
 
 def publish_bytes(payload, content_type="application/xml", config=None):
     key, universe, place = roblox_env(config)
@@ -203,12 +385,17 @@ def publish_bytes(payload, content_type="application/xml", config=None):
         return err("Roblox Open Cloud ist nicht erreichbar.", 502)
     if not response.ok:
         try:
-            detail = response.json()
+            detail=response.json()
         except ValueError:
-            detail = response.text[:400]
-        app.logger.warning("Roblox publish rejected HTTP %s", response.status_code)
-        return jsonify({"error": "Roblox hat die Veröffentlichung abgelehnt (HTTP " + str(response.status_code) + ").",
-                        "details": str(detail)[:600]}), 502
+            detail=response.text[:400]
+        app.logger.warning("Roblox publish rejected HTTP %s",response.status_code)
+        if response.status_code in (401,403):
+            message=("Roblox hat den API-Key nicht zum Aktualisieren dieser Experience autorisiert. "
+                     "Prüfe universe-places:write, die ausgewählte Experience, den richtigen Account/Gruppe "
+                     "und die Universe-/Place-ID. Erstelle bei Bedarf einen neuen Key.")
+            return jsonify({"error":message,"details":str(detail)[:600]}),response.status_code
+        return jsonify({"error":"Roblox hat die Veröffentlichung abgelehnt (HTTP "+str(response.status_code)+").",
+                        "details":str(detail)[:600]}),502
     try:
         result = response.json()
     except ValueError:
@@ -236,6 +423,45 @@ def status():
         "robloxConfiguredOnServer": all(os.environ.get(k, "").strip() for k in ("ROBLOX_API_KEY", "ROBLOX_UNIVERSE_ID", "ROBLOX_PLACE_ID"))
     })
 
+
+@app.get("/roblox-preview")
+def roblox_preview():
+    if not authorized():
+        return auth_error()
+    universe=str(request.args.get("universe_id","")).strip()
+    place=str(request.args.get("place_id","")).strip()
+    if not (universe.isdigit() and 1<=len(universe)<=24 and place.isdigit() and 1<=len(place)<=24):
+        return err("Universe ID und Place ID müssen gültige Zahlen sein.",400)
+    try:
+        game_response=requests.get("https://games.roblox.com/v1/games",params={"universeIds":universe},timeout=(5,12))
+        if not game_response.ok:
+            return err("Roblox-Spieldaten sind gerade nicht verfügbar (HTTP "+str(game_response.status_code)+").",502)
+        results=game_response.json().get("data",[])
+        if not results:
+            return err("Keine öffentliche Experience für diese Universe ID gefunden. Prüfe die ID und veröffentliche das Spiel.",404)
+        game=results[0]
+        thumbnail=""
+        thumb_response=requests.get("https://thumbnails.roblox.com/v1/games/"+universe+"/thumbnails",
+            params={"size":"768x432","format":"Png","isCircular":"false"},timeout=(5,12))
+        if thumb_response.ok:
+            for item in thumb_response.json().get("data",[]):
+                if item.get("state")=="Completed" and item.get("imageUrl"):
+                    thumbnail=item["imageUrl"]
+                    break
+        creator=game.get("creator") if isinstance(game.get("creator"),dict) else {}
+        description=re.sub(r"[\x00-\x1f]"," ",str(game.get("description",""))).strip()
+        return jsonify({"universeId":universe,"placeId":place,"name":str(game.get("name","Roblox Experience"))[:120],
+            "description":description[:900],"creator":str(creator.get("name","Roblox Creator"))[:120],
+            "playing":int(game.get("playing",0) or 0),"visits":int(game.get("visits",0) or 0),
+            "maxPlayers":int(game.get("maxPlayers",0) or 0),"thumbnailUrl":thumbnail,
+            "url":"https://www.roblox.com/games/"+place})
+    except requests.Timeout:
+        return err("Zeitüberschreitung beim Laden der Roblox-Experience. Versuche es erneut.",504)
+    except requests.RequestException:
+        return err("Roblox ist gerade nicht erreichbar, um die Experience anzuzeigen.",502)
+    except (ValueError,TypeError):
+        return err("Roblox hat ungültige Spieldaten zurückgegeben.",502)
+
 @app.post("/generate")
 def generate():
     if not authorized():
@@ -258,15 +484,33 @@ def generate():
         if not all(isinstance(x, str) for x in (code, web_demo, original)) or len(code) > 100000 or len(web_demo) > 100000:
             return err("Projektkontext ungültig oder zu groß.", 413)
         if code or web_demo:
-            prompt = ("Erweitere das bestehende Projekt, starte nicht neu. Ursprünglicher Auftrag: " + original[:4000] +
-                      "\nBisheriger Luau-Code:\n" + code + "\nBisherige HTML-Demo:\n" + web_demo + "\nNeue Änderung:\n" + prompt)
+            scene_context=previous.get("roblox_scene")
+            scene_text=json.dumps(scene_context,ensure_ascii=False)[:16000] if isinstance(scene_context,(dict,list)) else ""
+            prompt=("Erweitere das bestehende Projekt, starte nicht neu. Ursprünglicher Auftrag: "+original[:4000]+
+                    "\nBisheriger Luau-Code:\n"+code+"\nBisherige HTML-Demo:\n"+web_demo+
+                    "\nBisherige editierbare Roblox-Szene:\n"+scene_text+"\nNeue Änderung:\n"+prompt)
     try:
         try:
             result = parse_ai(ai(prompt.strip(), provider))
         except ValueError:
             result = parse_ai(ai("Return a valid JSON object with roblox_code and web_simulation for this request, with complete runnable HTML. No Markdown. Request:\n" + prompt[:10000], provider))
-        result = ensure_playable(prompt.strip(), provider, result)
-        return jsonify({"roblox_code": result["roblox_code"], "web_simulation": result["web_simulation"]})
+        result=ensure_playable(prompt.strip(),provider,result)
+        try:
+            validate_roblox_scripts(result["roblox_code"])
+        except ValueError as initial_error:
+            repair_prompt=("Repair the Roblox scripts in this project. Return a single valid JSON object with roblox_code, web_simulation, roblox_scene. "
+                "roblox_code MUST contain complete server and client scripts delimited by --[[GAME_KI_SERVER_SCRIPT]] and --[[GAME_KI_CLIENT_SCRIPT]], "
+                "with complete gameplay logic, no placeholders. Preserve the current gameplay and scene. Request:\n"+prompt.strip()[:4500]+
+                "\nValidation issue:\n"+str(initial_error)+"\nCurrent scripts:\n"+result["roblox_code"][:55000]+
+                "\nScene JSON:\n"+json.dumps(result["roblox_scene"],ensure_ascii=False)[:12000])
+            repaired=parse_ai(ai(repair_prompt,provider))
+            repaired["web_simulation"]=normalize_html(repaired["web_simulation"])
+            repaired["roblox_scene"]=normalize_scene(repaired.get("roblox_scene") or result.get("roblox_scene"),prompt.strip())
+            validate_roblox_scripts(repaired["roblox_code"])
+            result=repaired
+        return jsonify({"roblox_code":result["roblox_code"],
+                        "web_simulation":result["web_simulation"],
+                        "roblox_scene":result["roblox_scene"]})
     except RuntimeError as exc:
         return err(str(exc), 503)
     except ValueError as exc:
@@ -287,7 +531,7 @@ def publish_generated():
     if len(data["roblox_code"]) > 220000:
         return err("Luau-Code zu groß.", 413)
     try:
-        payload = place_xml(data["roblox_code"], str(data.get("game_name", "Game KI"))[:90])
+        payload = place_xml(data["roblox_code"], str(data.get("game_name", "Game KI"))[:90], data.get("roblox_scene"))
         if len(payload) > 4 * 1024 * 1024:
             return err("Place-Datei größer als 4 MiB.", 413)
         return publish_bytes(payload, config=data.get("roblox_config"))
