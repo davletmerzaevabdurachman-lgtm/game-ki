@@ -197,7 +197,7 @@ async function readApiJson(response){
       throw Error("Die KI-Anfrage hat das Vercel-Zeitlimit erreicht. Versuche es erneut mit einer kürzeren Spielbeschreibung.");
     if(lower.includes("an error occurred")||lower.includes("internal server error")||lower.includes("application error"))
       throw Error("Der Server hat eine Fehlerseite statt JSON geliefert (HTTP "+response.status+"). Prüfe die Vercel-Laufzeitprotokolle oder versuche es gleich erneut.");
-    var clean=String(raw||"").replace(/<[^>]*>/g," ").replace(/\\s+/g," ").trim();
+    var clean=String(raw||"").replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim();
     throw Error("Der Server hat keine gültige JSON-Antwort geliefert (HTTP "+response.status+"). "+(clean.slice(0,160)||"Leere Antwort."));
   }
 }
